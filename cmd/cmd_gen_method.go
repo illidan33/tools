@@ -15,7 +15,7 @@ var cmdGenMethod = &cobra.Command{
 }
 
 func init() {
-	cmdGenMethod.Flags().StringVarP(&cmdGenMethodFlags.CmdGenModleFilePath, "file-path", "f", "", "(required) file to generate method")
+	cmdGenMethod.Flags().StringVarP(&cmdGenMethodFlags.CmdGenModleFilePath, "file", "f", "", "(required) file to generate method")
 
 	cmdGen.AddCommand(cmdGenMethod)
 }
