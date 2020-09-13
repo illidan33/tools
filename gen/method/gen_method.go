@@ -12,26 +12,22 @@ type CmdGenMethodFlags struct {
 	CmdGenModleFilePath string
 }
 
-var tpData TemplateMethod
+var tpData TemplateGenMethod
 
 func init() {
-	tpData = TemplateMethod{
-		TemplateGenStruct: gen.TemplateGenStruct{
-			PackageName:   "",
-			PackageList:   map[string]string{},
-			StructName:     "",
-			TemplateFuncs: map[string]interface{}{},
+	tpData = TemplateGenMethod{
+		TemplateGenModle: gen.TemplateGenModle{
+			TemplateGenStruct: gen.TemplateGenStruct{
+				PackageName:   "",
+				PackageList:   map[string]string{},
+				StructName:    "",
+				StructComment: "",
+				TemplateFuncs: map[string]interface{}{},
+			},
+			ModleStructFields: map[string]gen.TemplateGenStructField{},
 		},
-		GormTable: gen.GormTable{
-			Name:          "",
-			Engine:        "",
-			Charset:       "",
-			Collate:       "",
-			Comment:       "",
-			AutoIncrement: 0,
-			Fields:        map[string]gen.GormField{},
-			Indexs:        map[string]gen.GormIndex{},
-		},
+		CommentIndexs: []TemplateGenMethodCommentIndex{},
+		TemplateGenMethodFuncs: []string{},
 	}
 	registeTemplateFunc(&tpData)
 }
@@ -52,7 +48,7 @@ func (flags CmdGenMethodFlags) CmdHandle() {
 		panic(err)
 	}
 
-	bf, err := tpData.ParseTemplate(templateMethodTxt, tpData)
+	bf, err := tpData.ParseTemplate(templateMethodTxt)
 	if err != nil {
 		panic(err)
 	}

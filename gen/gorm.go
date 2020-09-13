@@ -26,9 +26,7 @@ type GormTable struct {
 type GormField struct {
 	Name            string
 	Type            string
-	SqlType         string
 	IsUnsigned      bool
-	TypeLen         uint64
 	IsNull          bool
 	Default         string
 	IsAutoIncrement bool
@@ -38,14 +36,20 @@ type GormField struct {
 	IsKeyField      bool
 	KeyName         string
 	KeyType         types.IndexType
-	Sort            int
+	ModleSort       int
 }
 
 type GormIndex struct {
-	Name   string
-	Fields []GormField
-	Type   types.IndexType
-	Using  string
+	Name      string
+	Fields    []GormIndexField
+	Type      types.IndexType
+	Using     string
+	IndexSort int
+}
+
+type GormIndexField struct {
+	GormField
+	IndexFieldSort int
 }
 
 var FieldType = map[string]string{
@@ -76,27 +80,6 @@ var FieldType = map[string]string{
 	"DATETIME":   "time.Time",
 	"TIMESTAMP":  "time.Time",
 	"YEAR":       "time.Time",
-}
-
-var fieldConfig = map[types.SqlContentType]string{
-	types.SQLCONTENTTYPE__DEFAULT:         "DEFAULT",
-	types.SQLCONTENTTYPE__COMMENT:         "COMMENT",
-	types.SQLCONTENTTYPE__CREATE_TABLE:    "CREATE TABLE",
-	types.SQLCONTENTTYPE__KEY:             "KEY",
-	types.SQLCONTENTTYPE__PRIMARY_KEY:     "PRIMARY KEY",
-	types.SQLCONTENTTYPE__UNIQUE_KEY:      "UNIQUE KEY",
-	types.SQLCONTENTTYPE__USING:           "USING",
-	types.SQLCONTENTTYPE__ENGINE:          "ENGINE",
-	types.SQLCONTENTTYPE__CHARSET:         "CHARSET",
-	types.SQLCONTENTTYPE__COLLATE:         "COLLATE",
-	types.SQLCONTENTTYPE__AUTO__INCREMENT: "AUTO_INCREMENT",
-	types.SQLCONTENTTYPE__NULL:            "NULL",
-	types.SQLCONTENTTYPE__NOT_NULL:        "NOT NULL",
-	types.SQLCONTENTTYPE__NOT:             "NOT",
-	types.SQLCONTENTTYPE__CHARACTER_SET:   "CHARACTER SET",
-	types.SQLCONTENTTYPE__CHARACTER:       "CHARACTER",
-	types.SQLCONTENTTYPE__SET:             "SET",
-	types.SQLCONTENTTYPE__UNSIGNED:        "UNSIGNED",
 }
 
 func (gt *GormTable) isCreateTitle(s string) bool {
@@ -173,7 +156,29 @@ func (gt *GormTable) parseLineToTokens(s string) (rs []string, e error) {
 	return
 }
 
-func (gt *GormTable) parseLineKey(s string) (isLineField bool, e error) {
+func (gt *GormTable) parseIndexFieldString(gi *GormIndex, s string) error {
+	arr := strings.Split(s, ",")
+	for i, f := range arr {
+		f = strings.Trim(strings.Trim(f, " "), "`")
+		if v, ok := gt.Fields[f]; ok {
+			v.IsKeyField = true
+			v.KeyName = gi.Name
+			v.KeyType = gi.Type
+			tmp := GormIndexField{
+				GormField:      v,
+				IndexFieldSort: i,
+			}
+			gi.Fields = append(gi.Fields, tmp)
+
+		} else {
+			e := fmt.Errorf("Index field not map table field: %s", f)
+			return e
+		}
+	}
+	return nil
+}
+
+func (gt *GormTable) parseLineKey(s string, indexSortNum int) (isLineField bool, e error) {
 	lineStrs, err := gt.parseLineToTokens(s)
 	if err != nil {
 		e = err
@@ -193,34 +198,22 @@ func (gt *GormTable) parseLineKey(s string) (isLineField bool, e error) {
 			break
 		}
 	}
+	gormIndex := GormIndex{
+		Name:      "",
+		Type:      types.INDEXTYPE__INDEX,
+		Using:     using,
+		Fields:    []GormIndexField{},
+		IndexSort: indexSortNum,
+	}
 	if gt.isPrimaryKey(s) {
-		gormIndex := GormIndex{
-			Name:   "",
-			Type:   types.INDEXTYPE__PRIMARY,
-			Using:  using,
-			Fields: []GormField{},
-		}
+		gormIndex.Type = types.INDEXTYPE__PRIMARY
 		fd := gt.getDataBetweenString(lineStrs[2], "(", ")")
-		fd = strings.Trim(fd, "`")
-		if fd == "" {
-			e = errors.New("Primary key is empty")
-			return
-		}
-		if v, ok := gt.Fields[fd]; ok {
-			gormIndex.Fields = append(gormIndex.Fields, v)
-		} else {
-			e = errors.New("Primary key not in fields list")
-			return
-		}
+
+		gt.parseIndexFieldString(&gormIndex, fd)
 		gt.Indexs[gormIndex.Name] = gormIndex
 		return
 	}
-	gormIndex := GormIndex{
-		Name:   strings.Trim(lineStrs[1], "`"),
-		Type:   types.INDEXTYPE__INDEX,
-		Using:  lineStrs[4],
-		Fields: []GormField{},
-	}
+	gormIndex.Name = strings.Trim(lineStrs[1], "`")
 
 	keyNameInx := 0
 	for i, str := range lineStrs {
@@ -233,7 +226,7 @@ func (gt *GormTable) parseLineKey(s string) (isLineField bool, e error) {
 		}
 	}
 
-	if strings.Contains(strings.ToUpper(s), types.SQLCONTENTTYPE__PRIMARY_KEY.KeyString()) {
+	if strings.Contains(strings.ToUpper(s), types.SQLCONTENTTYPE__UNIQUE_KEY.KeyString()) {
 		gormIndex.Type = types.INDEXTYPE__UNIQUE_INDEX
 	}
 
@@ -247,30 +240,9 @@ func (gt *GormTable) parseLineKey(s string) (isLineField bool, e error) {
 		return
 	}
 
-	for {
-		if strings.Index(fieldStr, ", ") != -1 {
-			strings.ReplaceAll(fieldStr, ", ", ",")
-		} else {
-			break
-		}
-	}
-
-	fields := strings.Split(fieldStr, ",")
-	for _, f := range fields {
-		f = strings.Trim(f, "`")
-		if v, ok := gt.Fields[f]; ok {
-			v.IsKeyField = true
-			v.KeyName = gormIndex.Name
-			v.KeyType = gormIndex.Type
-			gormIndex.Fields = append(gormIndex.Fields, v)
-			gt.Fields[f] = v
-		} else {
-			e = fmt.Errorf("Index field not map table field: %s", f)
-			return
-		}
-	}
-
+	gt.parseIndexFieldString(&gormIndex, fieldStr)
 	gt.Indexs[gormIndex.Name] = gormIndex
+
 	return
 }
 
@@ -283,32 +255,13 @@ func (gt *GormTable) parseLineField(s string, sort int) error {
 		return errors.New("Line string array is empty")
 	}
 	gormField := GormField{
-		Sort: sort,
+		ModleSort: sort,
 	}
 	gormField.Name = strings.Trim(lineStrs[0], "`")
 
 	for i := 1; i < len(lineStrs); i++ {
 		if i == 1 {
-			gormField.SqlType = lineStrs[i]
-			ft := lineStrs[i]
-			fs := strings.Index(lineStrs[i], "(")
-			if fs != -1 {
-				ft = ft[:fs]
-				fe := gt.getDataBetweenString(lineStrs[i], "(", ")")
-				ftLen, err := strconv.ParseUint(fe, 10, 64)
-				if err != nil {
-					return fmt.Errorf("Parse field type length error: %s", err.Error())
-				}
-				gormField.TypeLen = ftLen
-			}
-			if v, ok := FieldType[strings.ToUpper(ft)]; ok {
-				gormField.Type = v
-				if gormField.IsUnsigned {
-					gormField.Type = "u" + gormField.Type
-				}
-			} else {
-				return fmt.Errorf("Field type string not in map: %s", ft)
-			}
+			gormField.Type = lineStrs[i]
 		} else {
 			fc := strings.ToUpper(lineStrs[i])
 			switch fc {
@@ -409,6 +362,7 @@ func (gt *GormTable) Parse(path string) error {
 
 	bf := bufio.NewReader(file)
 	fieldSortNum := 0
+	indexSortNum := 0
 	for {
 		line, _, err := bf.ReadLine()
 		if err != nil {
@@ -432,7 +386,7 @@ func (gt *GormTable) Parse(path string) error {
 				return err
 			}
 		} else if gt.isTableKey(ls) {
-			islineField, err := gt.parseLineKey(ls)
+			islineField, err := gt.parseLineKey(ls, indexSortNum)
 			if err != nil {
 				return err
 			}
@@ -442,6 +396,8 @@ func (gt *GormTable) Parse(path string) error {
 				if err != nil {
 					return err
 				}
+			} else {
+				indexSortNum++
 			}
 		} else {
 			fieldSortNum++

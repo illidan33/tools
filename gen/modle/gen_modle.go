@@ -16,17 +16,17 @@ type CmdGenModleFlags struct {
 	CmdGenModleWithDefaultTag    bool
 }
 
-var tpData TemplateModleStruct
+var tpData gen.TemplateGenModle
 
 func init() {
-	tpData = TemplateModleStruct{
+	tpData = gen.TemplateGenModle{
 		TemplateGenStruct: gen.TemplateGenStruct{
 			PackageName:   "",
 			PackageList:   map[string]string{},
-			StructName:     "",
+			StructName:    "",
 			TemplateFuncs: map[string]interface{}{},
 		},
-		GormTable: gen.GormTable{},
+		ModleStructFields: map[string]gen.TemplateGenStructField{},
 	}
 	registeTemplateFunc(&tpData)
 }
@@ -37,9 +37,8 @@ func (flag *CmdGenModleFlags) CmdHandle() {
 	if err != nil {
 		panic(err)
 	}
-
-	if !gen.IsExists(flag.CmdGenModleFilePath) {
-		panic(fmt.Errorf("modle file path not exists: %s", flag.CmdGenModleFilePath))
+	if gen.IsDir(flag.CmdGenModleFilePath) {
+		panic(fmt.Errorf("file path is not a file"))
 	}
 
 	exeFilePath, packageName, err := gen.GetExeFilePath()
@@ -47,41 +46,35 @@ func (flag *CmdGenModleFlags) CmdHandle() {
 		panic(fmt.Errorf("panic: file path not exists; calltrace:%s", string(debug.Stack())))
 	}
 
-	if gen.IsDir(flag.CmdGenModleFilePath) {
-		panic(fmt.Errorf("file path is not a file"))
-
-	}
-	_, fileName := filepath.Split(flag.CmdGenModleFilePath)
-	if err = flag.walkSqlPath(exeFilePath, packageName, flag.CmdGenModleFilePath, fileName); err != nil {
-		panic(err)
-	}
-}
-
-func (flag *CmdGenModleFlags) walkSqlPath(createPath string, pkName string, sqlPath string, filename string) (err error) {
 	// parse sql
 	gormTable := gen.GormTable{
 		Fields: map[string]gen.GormField{},
 		Indexs: map[string]gen.GormIndex{},
 	}
-	err = gormTable.Parse(sqlPath)
+	err = gormTable.Parse(flag.CmdGenModleFilePath)
 	if err != nil {
-		return
+		panic(err)
 	}
 
 	// init template data
-	tpData.PackageName = pkName
+	tpData.TransformGormToModle(gormTable, flag.CmdGenModleWithGormTag, flag.CmdGenModleWithSimpleGormTag, flag.CmdGenModleWithJsonTag, flag.CmdGenModleWithDefaultTag)
+	tpData.PackageName = packageName
 	tpData.StructName = gen.ToUpperCamelCase(gormTable.Name)
-	tpData.GormTable = gormTable
-	flag.CmdGenModleName = tpData.StructName
 
 	// create new file
-	bf, e := tpData.ParseTemplate(templateModleTxt, tpData)
-	if e != nil {
-		err = e
-		return
+	bf, err := tpData.ParseTemplate(templateModleTxt)
+	if err != nil {
+		panic(err)
 	}
-	filePath := fmt.Sprintf("%s/%s.go", createPath, gen.ToLowerSnakeCase(gormTable.Name))
-	err = tpData.FormatCodeToFile(filePath, bf)
 
-	return
+	filename := gormTable.Name
+	if flag.CmdGenModleName != "" {
+		filename = flag.CmdGenModleName
+		tpData.StructName = flag.CmdGenModleName
+	}
+	filePath := fmt.Sprintf("%s/%s.go", exeFilePath, gen.ToLowerSnakeCase(filename))
+	err = tpData.FormatCodeToFile(filePath, bf)
+	if err != nil {
+		panic(err)
+	}
 }

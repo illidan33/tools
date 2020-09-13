@@ -95,7 +95,7 @@ func ToUpperCamelCase(s string) string {
 			flag = false
 			dst.WriteString(TransLetterToUpper(letter))
 		} else {
-			dst.WriteString(TransLetterToLower(letter))
+			dst.WriteString(string(letter))
 		}
 	}
 
@@ -125,29 +125,37 @@ func ToLowerCamelCase(s string) string {
 // like transform "ToLowerSnakeCase" to "TO_LOWER_SNAKE_CASE"
 func ToUpperSnakeCase(s string) string {
 	var dst bytes.Buffer
-	for _, letter := range s {
+	for i, letter := range s {
 		if IsUpperLetter(letter) {
-			dst.WriteString("_")
-			dst.WriteString(TransLetterToUpper(letter))
+			if i == 0 {
+				dst.WriteString(string(letter))
+			} else {
+				dst.WriteString("_")
+				dst.WriteString(string(letter))
+			}
 		} else {
 			dst.WriteString(TransLetterToUpper(letter))
 		}
 	}
-	return dst.String()
+	return strings.ToUpper(dst.String())
 }
 
 // like transform "ToLowerSnakeCase" to "to_lower_snake_case"
 func ToLowerSnakeCase(s string) string {
 	var dst bytes.Buffer
-	for _, letter := range s {
+	for i, letter := range s {
 		if IsUpperLetter(letter) {
-			dst.WriteString("_")
-			dst.WriteString(TransLetterToLower(letter))
+			if i == 0 {
+				dst.WriteString(string(letter))
+			} else {
+				dst.WriteString("_")
+				dst.WriteString(string(letter))
+			}
 		} else {
-			dst.WriteString(TransLetterToLower(letter))
+			dst.WriteString(string(letter))
 		}
 	}
-	return dst.String()
+	return strings.ToLower(dst.String())
 }
 
 func GetDataBetweenFlag(source string, flag1 string, flag2 string) string {

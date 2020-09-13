@@ -22,8 +22,8 @@ func getPackageName() string {
 }
 
 var cmdRoot = &cobra.Command{
-	Use:   "gormtools",
-	Short: "illidan tools",
+	Use:   "tools",
+	Short: "tools for generate code",
 }
 
 func Execute() {

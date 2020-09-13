@@ -15,12 +15,12 @@ var cmdGenModle = &cobra.Command{
 }
 
 func init() {
-	cmdGenModle.Flags().StringVarP(&flags.CmdGenModleName, "modle-name", "m", "", "generate modle with name (default table name)")
-	cmdGenModle.Flags().StringVarP(&flags.CmdGenModleFilePath, "file-path", "f", "", "(required) generate modle from file path")
-	cmdGenModle.Flags().BoolVarP(&flags.CmdGenModleWithGormTag, "gorm", "g", true, "generate struct with gorm tag or not")
-	cmdGenModle.Flags().BoolVarP(&flags.CmdGenModleWithSimpleGormTag, "gorm-simple", "", true, "generate struct with simple gorm tag or not")
+	cmdGenModle.Flags().StringVarP(&flags.CmdGenModleName, "modle", "m", "", "generate modle with name (default table name)")
+	cmdGenModle.Flags().StringVarP(&flags.CmdGenModleFilePath, "file", "f", "", "(required) generate modle from file path")
+	cmdGenModle.Flags().BoolVarP(&flags.CmdGenModleWithGormTag, "gorm", "", true, "generate struct with gorm tag or not")
+	cmdGenModle.Flags().BoolVarP(&flags.CmdGenModleWithSimpleGormTag, "gorm-simple", "", false, "generate struct with simple gorm tag or not")
 	cmdGenModle.Flags().BoolVarP(&flags.CmdGenModleWithJsonTag, "json", "", true, "generate struct with json tag or not")
-	cmdGenModle.Flags().BoolVarP(&flags.CmdGenModleWithDefaultTag, "default", "d", false, "generate struct with default tag or not")
+	cmdGenModle.Flags().BoolVarP(&flags.CmdGenModleWithDefaultTag, "default", "", false, "generate struct with default tag or not")
 
 	cmdGen.AddCommand(cmdGenModle)
 }

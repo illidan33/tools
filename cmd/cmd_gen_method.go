@@ -8,7 +8,7 @@ import (
 var cmdGenMethodFlags method.CmdGenMethodFlags
 var cmdGenMethod = &cobra.Command{
 	Use:   "method",
-	Short: "generate functions of gorm modle",
+	Short: "generate gorm functions of gorm modle",
 	Run: func(cmd *cobra.Command, args []string) {
 		cmdGenMethodFlags.CmdHandle()
 	},
