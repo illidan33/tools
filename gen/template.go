@@ -19,9 +19,9 @@ type CmdGen interface {
 	CmdHandle(cwd string)
 }
 
-type TemplateGenModle struct {
+type TemplateGenmodel struct {
 	TemplateGenStruct
-	ModleStructFields map[string]TemplateGenStructField
+	ModelStructFields map[string]TemplateGenStructField
 }
 
 type TemplateGenStruct struct {
@@ -41,20 +41,20 @@ type TemplateGenStructField struct {
 	Sort    int
 }
 
-type TemplateGenModleFunc struct {
+type TemplateGenmodelFunc struct {
 	Name           string
 	BelongToStruct string
 	Args           []TemplateGenStructField
 	Returns        []string
 }
 
-func (tfm *TemplateGenModle) Registe(data map[string]interface{}) {
+func (tfm *TemplateGenmodel) Registe(data map[string]interface{}) {
 	for name, fc := range data {
 		tfm.TemplateFuncs[name] = fc
 	}
 }
 
-func (tfm *TemplateGenModle) Init() {
+func (tfm *TemplateGenmodel) Init() {
 	d := map[string]interface{}{
 		"var":   func(s string) string { return ToLowerCamelCase(s) },
 		"type":  func(s string) string { return ToUpperCamelCase(s) },
@@ -84,10 +84,10 @@ func (tfm *TemplateGenModle) Init() {
 	tfm.Registe(d)
 }
 
-func (tfm *TemplateGenModle) ParseTemplate(templateTxt string) (templateSource *bytes.Buffer, e error) {
+func (tfm *TemplateGenmodel) ParseTemplate(templateTxt string) (templateSource *bytes.Buffer, e error) {
 	templateSource = bytes.NewBuffer([]byte(""))
 
-	tp := template.New("sql_to_modle")
+	tp := template.New("sql_to_model")
 	tp.Funcs(tfm.TemplateFuncs)
 	if tp, e = tp.Parse(templateTxt); e != nil {
 		return
@@ -96,7 +96,7 @@ func (tfm *TemplateGenModle) ParseTemplate(templateTxt string) (templateSource *
 	return
 }
 
-func (tfm *TemplateGenModle) FormatCodeToFile(filePath string, templateSource *bytes.Buffer) (err error) {
+func (tfm *TemplateGenmodel) FormatCodeToFile(filePath string, templateSource *bytes.Buffer) (err error) {
 	var file *os.File
 	filePath, _ = filepath.Abs(filePath)
 	file, err = os.OpenFile(filePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
@@ -114,7 +114,7 @@ func (tfm *TemplateGenModle) FormatCodeToFile(filePath string, templateSource *b
 	return
 }
 
-func (tfm *TemplateGenModle) GetDstTree(filePath string) (*dst.File, error) {
+func (tfm *TemplateGenmodel) GetDstTree(filePath string) (*dst.File, error) {
 	var file *os.File
 	var err error
 	if IsExists(filePath) {
@@ -141,7 +141,7 @@ func (tfm *TemplateGenModle) GetDstTree(filePath string) (*dst.File, error) {
 	return f, nil
 }
 
-func (tfm *TemplateGenModle) TransformGormToModle(gormTable GormTable, hasGorm bool, isSimpleGorm bool, hasJson bool, hasDefault bool) error {
+func (tfm *TemplateGenmodel) TransformGormTomodel(gormTable GormTable, hasGorm bool, isSimpleGorm bool, hasJson bool, hasDefault bool) error {
 	tfm.StructName = gormTable.Name
 
 	// fields
@@ -152,7 +152,7 @@ func (tfm *TemplateGenModle) TransformGormToModle(gormTable GormTable, hasGorm b
 			TypeLen: 0,
 			Tag:     "",
 			Comment: field.Comment,
-			Sort:    field.ModleSort,
+			Sort:    field.modelSort,
 		}
 
 		tgsf.Type = field.Type
@@ -199,7 +199,7 @@ func (tfm *TemplateGenModle) TransformGormToModle(gormTable GormTable, hasGorm b
 		}
 
 		tgsf.Tag += "`"
-		tfm.ModleStructFields[tgsf.Name] = tgsf
+		tfm.ModelStructFields[tgsf.Name] = tgsf
 	}
 
 	// indexs
@@ -236,7 +236,7 @@ func (tfm *TemplateGenModle) TransformGormToModle(gormTable GormTable, hasGorm b
 	return nil
 }
 
-func (tfm *TemplateGenModle) GenFuncName(fields []TemplateGenStructField) string {
+func (tfm *TemplateGenmodel) GenFuncName(fields []TemplateGenStructField) string {
 	str := ""
 	for i, f := range fields {
 		if i == 0 {

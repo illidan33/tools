@@ -2,12 +2,12 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
-	"myprojects/tools/gen/modle"
+	"myprojects/tools/gen/model"
 )
 
-var flags modle.CmdGenModleFlags
-var cmdGenModle = &cobra.Command{
-	Use:   "modle",
+var flags model.CmdGenmodelFlags
+var cmdGenmodel = &cobra.Command{
+	Use:   "model",
 	Short: "generate ddl sql to struct",
 	Run: func(cmd *cobra.Command, args []string) {
 		flags.CmdHandle()
@@ -15,12 +15,12 @@ var cmdGenModle = &cobra.Command{
 }
 
 func init() {
-	cmdGenModle.Flags().StringVarP(&flags.CmdGenModleName, "modle", "m", "", "generate modle with name (default table name)")
-	cmdGenModle.Flags().StringVarP(&flags.CmdGenModleFilePath, "file", "f", "", "(required) generate modle from file path")
-	cmdGenModle.Flags().BoolVarP(&flags.CmdGenModleWithGormTag, "gorm", "", true, "generate struct with gorm tag or not")
-	cmdGenModle.Flags().BoolVarP(&flags.CmdGenModleWithSimpleGormTag, "gorm-simple", "", false, "generate struct with simple gorm tag or not")
-	cmdGenModle.Flags().BoolVarP(&flags.CmdGenModleWithJsonTag, "json", "", true, "generate struct with json tag or not")
-	cmdGenModle.Flags().BoolVarP(&flags.CmdGenModleWithDefaultTag, "default", "", false, "generate struct with default tag or not")
+	cmdGenmodel.Flags().StringVarP(&flags.CmdGenmodelName, "model", "m", "", "generate model with name (default table name)")
+	cmdGenmodel.Flags().StringVarP(&flags.CmdGenmodelFilePath, "file", "f", "", "(required) generate model from file path")
+	cmdGenmodel.Flags().BoolVarP(&flags.CmdGenmodelWithGormTag, "gorm", "", true, "generate struct with gorm tag or not")
+	cmdGenmodel.Flags().BoolVarP(&flags.CmdGenmodelWithSimpleGormTag, "gorm-simple", "", false, "generate struct with simple gorm tag or not")
+	cmdGenmodel.Flags().BoolVarP(&flags.CmdGenmodelWithJsonTag, "json", "", true, "generate struct with json tag or not")
+	cmdGenmodel.Flags().BoolVarP(&flags.CmdGenmodelWithDefaultTag, "default", "", false, "generate struct with default tag or not")
 
-	cmdGen.AddCommand(cmdGenModle)
+	cmdGen.AddCommand(cmdGenmodel)
 }

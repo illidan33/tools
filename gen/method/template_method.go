@@ -80,7 +80,7 @@ var templateMethodBatchFetchByIndexListTxt = `func (%s *%s) BatchFetchBy%sList(d
 }`
 
 type TemplateGenMethod struct {
-	gen.TemplateGenModle
+	gen.TemplateGenmodel
 	CommentIndexs          []TemplateGenMethodCommentIndex
 	TemplateGenMethodFuncs []string
 }
@@ -212,7 +212,7 @@ func (tgm *TemplateGenMethod) parseDstTree(file *dst.File) error {
 				}
 				templateField.Type += "." + ExprType.Sel.Name
 			}
-			tgm.ModleStructFields[templateField.Name] = templateField
+			tgm.ModelStructFields[templateField.Name] = templateField
 		}
 
 		// comment def of struct
@@ -238,7 +238,7 @@ func (tgm *TemplateGenMethod) parseDstTree(file *dst.File) error {
 						}
 						tgmci.Fields = make([]gen.TemplateGenStructField, 0)
 						for i := 3; i < len(arr); i++ {
-							if f, ok := tgm.ModleStructFields[arr[i]]; !ok {
+							if f, ok := tgm.ModelStructFields[arr[i]]; !ok {
 								return fmt.Errorf("index field of comment def is not struct field: %s", arr[i])
 							} else {
 								tgmci.Fields = append(tgmci.Fields, f)
@@ -253,7 +253,7 @@ func (tgm *TemplateGenMethod) parseDstTree(file *dst.File) error {
 
 	// TODO(illidan/2020/9/13):
 	//for _, index := range tgm.CommentIndexs {
-	//	tgmfFetch := gen.TemplateGenModleFunc{
+	//	tgmfFetch := gen.TemplateGenmodelFunc{
 	//		Name:           "",
 	//		BelongToStruct: tgm.StructName,
 	//		Args:           index.Fields,
@@ -268,17 +268,17 @@ func (tgm *TemplateGenMethod) parseDstTree(file *dst.File) error {
 	//		}
 	//	}
 	//	tgmfFetch.Name = "FetchBy" + gen.ToUpperCamelCase(name)
-	//	tgm.ModleFuncs = append(tgm.ModleFuncs, tgmfFetch)
+	//	tgm.modelFuncs = append(tgm.modelFuncs, tgmfFetch)
 	//
 	//	if index.Type == types.INDEXTYPE__INDEX {
-	//		tgmfNew := gen.TemplateGenModleFunc{
+	//		tgmfNew := gen.TemplateGenmodelFunc{
 	//			Name:           "",
 	//			BelongToStruct: tgm.StructName,
 	//			Args:           index.Fields,
 	//			Returns:        []interface{}{"error"},
 	//		}
 	//		tgmfNew.Name = "BatchFetchBy" + gen.ToUpperCamelCase(name)
-	//		tgm.ModleFuncs = append(tgm.ModleFuncs, tgmfNew)
+	//		tgm.modelFuncs = append(tgm.modelFuncs, tgmfNew)
 	//	}
 	//}
 
@@ -313,15 +313,15 @@ func (tgm *TemplateGenMethod) parseToMethods() error {
 }
 
 func (tgm *TemplateGenMethod) Parse(flags CmdGenMethodFlags) error {
-	basePath, _ := filepath.Split(flags.CmdGenModleFilePath)
+	basePath, _ := filepath.Split(flags.CmdGenmodelFilePath)
 	s := strings.LastIndex(basePath, "/")
 	if s == -1 {
 		return fmt.Errorf("basepath error: %s", basePath)
 	}
 
-	tgm.StructName = flags.CmdGenModleName
+	tgm.StructName = flags.CmdGenmodelName
 
-	dstTree, err := tgm.GetDstTree(flags.CmdGenModleFilePath)
+	dstTree, err := tgm.GetDstTree(flags.CmdGenmodelFilePath)
 	if err != nil {
 		return err
 	}

@@ -8,14 +8,14 @@ import (
 var cmdGenMethodFlags method.CmdGenMethodFlags
 var cmdGenMethod = &cobra.Command{
 	Use:   "method",
-	Short: "generate gorm functions of gorm modle",
+	Short: "generate gorm functions of gorm model",
 	Run: func(cmd *cobra.Command, args []string) {
 		cmdGenMethodFlags.CmdHandle()
 	},
 }
 
 func init() {
-	cmdGenMethod.Flags().StringVarP(&cmdGenMethodFlags.CmdGenModleFilePath, "file", "f", "", "(required) file to generate method")
+	cmdGenMethod.Flags().StringVarP(&cmdGenMethodFlags.CmdGenmodelFilePath, "file", "f", "", "(required) file to generate method")
 
 	cmdGen.AddCommand(cmdGenMethod)
 }

@@ -8,15 +8,15 @@ import (
 )
 
 type CmdGenMethodFlags struct {
-	CmdGenModleName     string
-	CmdGenModleFilePath string
+	CmdGenmodelName     string
+	CmdGenmodelFilePath string
 }
 
 var tpData TemplateGenMethod
 
 func init() {
 	tpData = TemplateGenMethod{
-		TemplateGenModle: gen.TemplateGenModle{
+		TemplateGenmodel: gen.TemplateGenmodel{
 			TemplateGenStruct: gen.TemplateGenStruct{
 				PackageName:   "",
 				PackageList:   map[string]string{},
@@ -24,7 +24,7 @@ func init() {
 				StructComment: "",
 				TemplateFuncs: map[string]interface{}{},
 			},
-			ModleStructFields: map[string]gen.TemplateGenStructField{},
+			ModelStructFields: map[string]gen.TemplateGenStructField{},
 		},
 		CommentIndexs: []TemplateGenMethodCommentIndex{},
 		TemplateGenMethodFuncs: []string{},
@@ -34,13 +34,13 @@ func init() {
 
 func (flags CmdGenMethodFlags) CmdHandle() {
 	var err error
-	flags.CmdGenModleFilePath, err = filepath.Abs(flags.CmdGenModleFilePath)
+	flags.CmdGenmodelFilePath, err = filepath.Abs(flags.CmdGenmodelFilePath)
 	if err != nil {
 		panic(err)
 	}
 
-	if !gen.IsExists(flags.CmdGenModleFilePath) {
-		panic(fmt.Errorf("modle file path not exists: %s", flags.CmdGenModleFilePath))
+	if !gen.IsExists(flags.CmdGenmodelFilePath) {
+		panic(fmt.Errorf("model file path not exists: %s", flags.CmdGenmodelFilePath))
 	}
 
 	// init template data
@@ -53,7 +53,7 @@ func (flags CmdGenMethodFlags) CmdHandle() {
 		panic(err)
 	}
 
-	basePath, fileName := filepath.Split(flags.CmdGenModleFilePath)
+	basePath, fileName := filepath.Split(flags.CmdGenmodelFilePath)
 	fns := strings.LastIndex(fileName, ".")
 	err = tpData.FormatCodeToFile(fmt.Sprintf("%s/%s_generate.go", basePath, fileName[:fns]), bf)
 	if err != nil {

@@ -1,4 +1,4 @@
-package modle
+package model
 
 import (
 	"fmt"
@@ -7,37 +7,37 @@ import (
 	"runtime/debug"
 )
 
-type CmdGenModleFlags struct {
-	CmdGenModleName              string
-	CmdGenModleFilePath          string
-	CmdGenModleWithGormTag       bool
-	CmdGenModleWithSimpleGormTag bool
-	CmdGenModleWithJsonTag       bool
-	CmdGenModleWithDefaultTag    bool
+type CmdGenmodelFlags struct {
+	CmdGenmodelName              string
+	CmdGenmodelFilePath          string
+	CmdGenmodelWithGormTag       bool
+	CmdGenmodelWithSimpleGormTag bool
+	CmdGenmodelWithJsonTag       bool
+	CmdGenmodelWithDefaultTag    bool
 }
 
-var tpData gen.TemplateGenModle
+var tpData gen.TemplateGenmodel
 
 func init() {
-	tpData = gen.TemplateGenModle{
+	tpData = gen.TemplateGenmodel{
 		TemplateGenStruct: gen.TemplateGenStruct{
 			PackageName:   "",
 			PackageList:   map[string]string{},
 			StructName:    "",
 			TemplateFuncs: map[string]interface{}{},
 		},
-		ModleStructFields: map[string]gen.TemplateGenStructField{},
+		ModelStructFields: map[string]gen.TemplateGenStructField{},
 	}
 	registeTemplateFunc(&tpData)
 }
 
-func (flag *CmdGenModleFlags) CmdHandle() {
+func (flag *CmdGenmodelFlags) CmdHandle() {
 	var err error
-	flag.CmdGenModleFilePath, err = filepath.Abs(flag.CmdGenModleFilePath)
+	flag.CmdGenmodelFilePath, err = filepath.Abs(flag.CmdGenmodelFilePath)
 	if err != nil {
 		panic(err)
 	}
-	if gen.IsDir(flag.CmdGenModleFilePath) {
+	if gen.IsDir(flag.CmdGenmodelFilePath) {
 		panic(fmt.Errorf("file path is not a file"))
 	}
 
@@ -51,26 +51,26 @@ func (flag *CmdGenModleFlags) CmdHandle() {
 		Fields: map[string]gen.GormField{},
 		Indexs: map[string]gen.GormIndex{},
 	}
-	err = gormTable.Parse(flag.CmdGenModleFilePath)
+	err = gormTable.Parse(flag.CmdGenmodelFilePath)
 	if err != nil {
 		panic(err)
 	}
 
 	// init template data
-	tpData.TransformGormToModle(gormTable, flag.CmdGenModleWithGormTag, flag.CmdGenModleWithSimpleGormTag, flag.CmdGenModleWithJsonTag, flag.CmdGenModleWithDefaultTag)
+	tpData.TransformGormTomodel(gormTable, flag.CmdGenmodelWithGormTag, flag.CmdGenmodelWithSimpleGormTag, flag.CmdGenmodelWithJsonTag, flag.CmdGenmodelWithDefaultTag)
 	tpData.PackageName = packageName
 	tpData.StructName = gen.ToUpperCamelCase(gormTable.Name)
 
 	// create new file
-	bf, err := tpData.ParseTemplate(templateModleTxt)
+	bf, err := tpData.ParseTemplate(templatemodelTxt)
 	if err != nil {
 		panic(err)
 	}
 
 	filename := gormTable.Name
-	if flag.CmdGenModleName != "" {
-		filename = flag.CmdGenModleName
-		tpData.StructName = flag.CmdGenModleName
+	if flag.CmdGenmodelName != "" {
+		filename = flag.CmdGenmodelName
+		tpData.StructName = flag.CmdGenmodelName
 	}
 	filePath := fmt.Sprintf("%s/%s.go", exeFilePath, gen.ToLowerSnakeCase(filename))
 	err = tpData.FormatCodeToFile(filePath, bf)

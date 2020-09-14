@@ -1,17 +1,17 @@
-package modle
+package model
 
 import (
 	"myprojects/tools/gen"
 	"sort"
 )
 
-const templateModleTxt = `package {{ .PackageName }}
+const templatemodelTxt = `package {{ .PackageName }}
 
 import (
 	{{ range $value := .PackageList }} "{{ $value }}" {{end}}
 )
 {{$filename := var .StructName}}
-{{$fields := sort $.ModleStructFields}}
+{{$fields := sort $.ModelStructFields}}
 
 //go:generate tools gen method -f ./{{snake $filename}}.go
 {{html .StructComment}}
@@ -21,7 +21,7 @@ type {{ .StructName }} struct{
 	{{end}}
 }`
 
-func registeTemplateFunc(tms *gen.TemplateGenModle) {
+func registeTemplateFunc(tms *gen.TemplateGenmodel) {
 	tms.Init()
 	tms.Registe(map[string]interface{}{
 		"sortField": func(fields map[string]gen.TemplateGenStructField) []gen.TemplateGenStructField {

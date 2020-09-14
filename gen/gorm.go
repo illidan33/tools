@@ -36,7 +36,7 @@ type GormField struct {
 	IsKeyField      bool
 	KeyName         string
 	KeyType         types.IndexType
-	ModleSort       int
+	modelSort       int
 }
 
 type GormIndex struct {
@@ -255,7 +255,7 @@ func (gt *GormTable) parseLineField(s string, sort int) error {
 		return errors.New("Line string array is empty")
 	}
 	gormField := GormField{
-		ModleSort: sort,
+		modelSort: sort,
 	}
 	gormField.Name = strings.Trim(lineStrs[0], "`")
 
