@@ -1,4 +1,4 @@
-package gen
+package common
 
 import (
 	"bytes"
@@ -89,7 +89,7 @@ func ToUpperCamelCase(s string) string {
 	for index, letter := range s {
 		if index == 0 {
 			dst.WriteString(TransLetterToUpper(letter))
-		} else if letter == '_' {
+		} else if letter == '_' || letter == '-' {
 			flag = true
 		} else if flag {
 			flag = false
@@ -109,13 +109,13 @@ func ToLowerCamelCase(s string) string {
 	for index, letter := range s {
 		if index == 0 {
 			dst.WriteString(TransLetterToLower(letter))
-		} else if letter == '_' {
+		} else if letter == '_' || letter == '-' {
 			flag = true
 		} else if flag {
 			flag = false
 			dst.WriteString(TransLetterToUpper(letter))
 		} else {
-			dst.WriteString(TransLetterToLower(letter))
+			dst.WriteString(string(letter))
 		}
 	}
 

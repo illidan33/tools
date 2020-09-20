@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"myprojects/tools/gen/types"
+	"myprojects/tools/common"
+	"myprojects/tools/gen/util/types"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -19,8 +21,8 @@ type GormTable struct {
 	Collate       string
 	Comment       string
 	AutoIncrement uint64
-	Fields        map[string]GormField
-	Indexs        map[string]GormIndex
+	Fields        []GormField
+	Indexs        []GormIndex
 }
 
 type GormField struct {
@@ -36,7 +38,7 @@ type GormField struct {
 	IsKeyField      bool
 	KeyName         string
 	KeyType         types.IndexType
-	modelSort       int
+	ModelSort       int
 }
 
 type GormIndex struct {
@@ -50,6 +52,13 @@ type GormIndex struct {
 type GormIndexField struct {
 	GormField
 	IndexFieldSort int
+}
+
+type GormFlags struct {
+	HasGorm      bool
+	IsSimpleGorm bool
+	HasJson      bool
+	HasDefault   bool
 }
 
 var FieldType = map[string]string{
@@ -83,42 +92,42 @@ var FieldType = map[string]string{
 }
 
 func (gt *GormTable) isCreateTitle(s string) bool {
-	if strings.Contains(strings.ToUpper(s), types.SQLCONTENTTYPE__CREATE_TABLE.KeyString()) {
+	if strings.Contains(strings.ToUpper(s), types.SQLCONTENTTYPE__CREATE_TABLE) {
 		return true
 	}
 	return false
 }
 
 func (gt *GormTable) isTableKey(s string) bool {
-	if strings.Contains(strings.ToUpper(s), types.SQLCONTENTTYPE__KEY.KeyString()) {
+	if strings.Contains(strings.ToUpper(s), types.SQLCONTENTTYPE__KEY) {
 		return true
 	}
 	return false
 }
 
 func (gt *GormTable) isPrimaryKey(s string) bool {
-	if strings.Contains(strings.ToUpper(s), types.SQLCONTENTTYPE__PRIMARY_KEY.KeyString()) {
+	if strings.Contains(strings.ToUpper(s), types.SQLCONTENTTYPE__PRIMARY_KEY) {
 		return true
 	}
 	return false
 }
 
 func (gt *GormTable) isUniqueKey(s string) bool {
-	if strings.Contains(strings.ToUpper(s), types.SQLCONTENTTYPE__UNIQUE_KEY.KeyString()) {
+	if strings.Contains(strings.ToUpper(s), types.SQLCONTENTTYPE__UNIQUE_KEY) {
 		return true
 	}
 	return false
 }
 
 func (gt *GormTable) isEngineEnd(s string) bool {
-	if strings.Contains(strings.ToUpper(s), types.SQLCONTENTTYPE__ENGINE.KeyString()) {
+	if strings.Contains(strings.ToUpper(s), types.SQLCONTENTTYPE__ENGINE) {
 		return true
 	}
 	return false
 }
 
 func (gt *GormTable) isComent(s string) bool {
-	return strings.ToUpper(s) == types.SQLCONTENTTYPE__COMMENT.KeyString()
+	return strings.ToUpper(s) == types.SQLCONTENTTYPE__COMMENT
 }
 
 func (gt *GormTable) parseLineToTokens(s string) (rs []string, e error) {
@@ -158,9 +167,13 @@ func (gt *GormTable) parseLineToTokens(s string) (rs []string, e error) {
 
 func (gt *GormTable) parseIndexFieldString(gi *GormIndex, s string) error {
 	arr := strings.Split(s, ",")
+	fieldsMap := map[string]GormField{}
+	for _, field := range gt.Fields {
+		fieldsMap[field.Name] = field
+	}
 	for i, f := range arr {
 		f = strings.Trim(strings.Trim(f, " "), "`")
-		if v, ok := gt.Fields[f]; ok {
+		if v, ok := fieldsMap[f]; ok {
 			v.IsKeyField = true
 			v.KeyName = gi.Name
 			v.KeyType = gi.Type
@@ -193,7 +206,7 @@ func (gt *GormTable) parseLineKey(s string, indexSortNum int) (isLineField bool,
 
 	using := ""
 	for k, str := range lineStrs {
-		if strings.ToUpper(str) == types.SQLCONTENTTYPE__USING.KeyString() {
+		if strings.ToUpper(str) == types.SQLCONTENTTYPE__USING {
 			using = lineStrs[k+1]
 			break
 		}
@@ -210,7 +223,7 @@ func (gt *GormTable) parseLineKey(s string, indexSortNum int) (isLineField bool,
 		fd := gt.getDataBetweenString(lineStrs[2], "(", ")")
 
 		gt.parseIndexFieldString(&gormIndex, fd)
-		gt.Indexs[gormIndex.Name] = gormIndex
+		gt.Indexs = append(gt.Indexs, gormIndex)
 		return
 	}
 	gormIndex.Name = strings.Trim(lineStrs[1], "`")
@@ -218,15 +231,15 @@ func (gt *GormTable) parseLineKey(s string, indexSortNum int) (isLineField bool,
 	keyNameInx := 0
 	for i, str := range lineStrs {
 		strU := strings.ToUpper(str)
-		if strU == types.SQLCONTENTTYPE__KEY.KeyString() {
+		if strU == types.SQLCONTENTTYPE__KEY {
 			gormIndex.Name = strings.Trim(lineStrs[i+1], "`")
 			keyNameInx = i + 1
-		} else if strU == types.SQLCONTENTTYPE__USING.KeyString() {
+		} else if strU == types.SQLCONTENTTYPE__USING {
 			gormIndex.Using = lineStrs[i+1]
 		}
 	}
 
-	if strings.Contains(strings.ToUpper(s), types.SQLCONTENTTYPE__UNIQUE_KEY.KeyString()) {
+	if strings.Contains(strings.ToUpper(s), types.SQLCONTENTTYPE__UNIQUE_KEY) {
 		gormIndex.Type = types.INDEXTYPE__UNIQUE_INDEX
 	}
 
@@ -241,7 +254,10 @@ func (gt *GormTable) parseLineKey(s string, indexSortNum int) (isLineField bool,
 	}
 
 	gt.parseIndexFieldString(&gormIndex, fieldStr)
-	gt.Indexs[gormIndex.Name] = gormIndex
+	if gt.Indexs == nil {
+		gt.Indexs = make([]GormIndex, 0)
+	}
+	gt.Indexs = append(gt.Indexs, gormIndex)
 
 	return
 }
@@ -255,7 +271,7 @@ func (gt *GormTable) parseLineField(s string, sort int) error {
 		return errors.New("Line string array is empty")
 	}
 	gormField := GormField{
-		modelSort: sort,
+		ModelSort: sort,
 	}
 	gormField.Name = strings.Trim(lineStrs[0], "`")
 
@@ -265,33 +281,36 @@ func (gt *GormTable) parseLineField(s string, sort int) error {
 		} else {
 			fc := strings.ToUpper(lineStrs[i])
 			switch fc {
-			case types.SQLCONTENTTYPE__UNSIGNED.KeyString():
+			case types.SQLCONTENTTYPE__UNSIGNED:
 				gormField.IsUnsigned = true
-			case types.SQLCONTENTTYPE__AUTO__INCREMENT.KeyString():
+			case types.SQLCONTENTTYPE__AUTO__INCREMENT:
 				gormField.IsAutoIncrement = true
-			case types.SQLCONTENTTYPE__CHARACTER.KeyString():
-				if lineStrs[i+1] == types.SQLCONTENTTYPE__SET.KeyString() {
+			case types.SQLCONTENTTYPE__CHARACTER:
+				if lineStrs[i+1] == types.SQLCONTENTTYPE__SET {
 					gormField.Character = lineStrs[i+2]
 				} else {
 					return fmt.Errorf("Parse character of field error: %v", lineStrs)
 				}
-			case types.SQLCONTENTTYPE__NULL.KeyString():
-				if lineStrs[i-1] != types.SQLCONTENTTYPE__NOT.KeyString() {
+			case types.SQLCONTENTTYPE__NULL:
+				if lineStrs[i-1] != types.SQLCONTENTTYPE__NOT {
 					gormField.IsNull = true
 				}
-			case types.SQLCONTENTTYPE__DEFAULT.KeyString():
-				if lineStrs[i+1] == types.SQLCONTENTTYPE__NULL.KeyString() {
+			case types.SQLCONTENTTYPE__DEFAULT:
+				if lineStrs[i+1] == types.SQLCONTENTTYPE__NULL {
 					gormField.IsNull = true
 				} else {
 					gormField.Default = strings.Trim(lineStrs[i+1], "'")
 				}
-			case types.SQLCONTENTTYPE__COMMENT.KeyString():
+			case types.SQLCONTENTTYPE__COMMENT:
 				gormField.Comment = strings.Trim(strings.Trim(lineStrs[i+1], "'"), ",")
 			default:
 			}
 		}
 	}
-	gt.Fields[gormField.Name] = gormField
+	if gt.Fields == nil {
+		gt.Fields = make([]GormField, 0)
+	}
+	gt.Fields = append(gt.Fields, gormField)
 	return nil
 }
 
@@ -407,6 +426,103 @@ func (gt *GormTable) Parse(path string) error {
 			}
 		}
 	}
+	sort.Slice(gt.Fields, func(i, j int) bool {
+		if gt.Fields[i].ModelSort < gt.Fields[j].ModelSort {
+			return true
+		}
+		return false
+	})
 
 	return nil
+}
+
+func (gt *GormTable) TransformGormToModel(tm *TemplateModel, gormFlags GormFlags) (packageList []string, err error) {
+	tm.ModelName = gt.Name
+
+	// fields
+	for _, field := range gt.Fields {
+		tgsf := TemplateModelField{
+			Name:    common.ToUpperCamelCase(field.Name),
+			Type:    "",
+			Tag:     "",
+			Comment: field.Comment,
+		}
+
+		tgsf.Type = field.Type
+		fs := strings.Index(field.Type, "(")
+		if fs != -1 {
+			tgsf.Type = field.Type[:fs]
+		}
+
+		if v, ok := FieldType[strings.ToUpper(tgsf.Type)]; ok {
+			tgsf.Type = v
+			if field.IsUnsigned {
+				tgsf.Type = "u" + tgsf.Type
+			}
+			if tgsf.Type == "time.Time" {
+				packageList = []string{"time"}
+			}
+		} else {
+			err = fmt.Errorf("Field type string not in map: %s", tgsf.Type)
+			return
+		}
+
+		tgsf.Tag = "`"
+		null := types.SQLCONTENTTYPE__NOT_NULL
+		if field.IsNull {
+			null = types.SQLCONTENTTYPE__NULL
+		}
+		if gormFlags.HasGorm {
+			if gormFlags.IsSimpleGorm {
+				tgsf.Tag = fmt.Sprintf("%s%s:\"column:%s\"", tgsf.Tag, types.MODELTAGTYPE__GORM, field.Name)
+			} else {
+				tgsf.Tag = fmt.Sprintf("%s%s:\"column:%s;type:%s;%s;default:%s\"", tgsf.Tag, types.MODELTAGTYPE__GORM, field.Name, field.Type, null, field.Default)
+			}
+		}
+		if gormFlags.HasJson {
+			tgsf.Tag = fmt.Sprintf("%s %s:\"%s\"", tgsf.Tag, types.MODELTAGTYPE__JSON, common.ToLowerCamelCase(field.Name))
+		}
+		if gormFlags.HasDefault {
+			tgsf.Tag = fmt.Sprintf("%s %s:\"%s\"", tgsf.Tag, types.MODELTAGTYPE__DEFAULT, field.Default)
+		}
+
+		tgsf.Tag += "`"
+		if tm.TemplateModelFields == nil {
+			tm.TemplateModelFields = make([]TemplateModelField, 0)
+		}
+		tm.TemplateModelFields = append(tm.TemplateModelFields, tgsf)
+	}
+
+	// indexs
+	indexs := make([]GormIndex, len(gt.Indexs))
+	i := 0
+	for _, index := range gt.Indexs {
+		indexs[i] = index
+		i++
+	}
+	sort.Slice(indexs, func(i, j int) bool {
+		if indexs[i].IndexSort < indexs[j].IndexSort {
+			return true
+		}
+		return false
+	})
+	if len(gt.Indexs) > 0 {
+		for _, index := range indexs {
+			str := ""
+			for kk, field := range index.Fields {
+				if kk == 0 {
+					if index.Type == types.INDEXTYPE__PRIMARY {
+						str = fmt.Sprintf("\n// @%s %s %s", types.SQLCONTENTTYPE__DEF, index.Type.KeyLowerString(), common.ToUpperCamelCase(field.Name))
+					} else {
+						str = fmt.Sprintf("\n// @def %s:%s %s", index.Type.KeyLowerString(), index.Name, common.ToUpperCamelCase(field.Name))
+					}
+				} else {
+					str = fmt.Sprintf("%s %s", str, common.ToUpperCamelCase(field.Name))
+				}
+			}
+			tm.ModelComment += str
+		}
+	}
+
+	return
 }

@@ -2,20 +2,19 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
+	"myprojects/tools/gen"
 	"myprojects/tools/gen/method"
 )
 
-var cmdGenMethodFlags method.CmdGenMethodFlags
+var genMethod method.CmdGenMethod
 var cmdGenMethod = &cobra.Command{
 	Use:   "method",
 	Short: "generate gorm functions of gorm model",
 	Run: func(cmd *cobra.Command, args []string) {
-		cmdGenMethodFlags.CmdHandle()
+		gen.Generate(&genMethod)
 	},
 }
 
 func init() {
-	cmdGenMethod.Flags().StringVarP(&cmdGenMethodFlags.CmdGenmodelFilePath, "file", "f", "", "(required) file to generate method")
-
 	cmdGen.AddCommand(cmdGenMethod)
 }

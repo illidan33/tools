@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"github.com/dave/dst"
 	"go/token"
+	"myprojects/tools/common"
 	"myprojects/tools/gen"
-	"myprojects/tools/gen/types"
-	"path/filepath"
+	"myprojects/tools/gen/util/types"
 	"strings"
 	"text/template"
 )
@@ -19,100 +19,119 @@ package {{ .PackageName }}
 import (
 	"github.com/jinzhu/gorm"
 )
-{{ $StructNames := printf "%ss" .StructName }}
+{{ $ModelNames := printf "%ss" .ModelName }}
 
-type {{ $StructNames }} []{{ .StructName }}
+type {{$ModelNames}} []{{$.ModelName}}
 
-{{ range $func := .TemplateGenMethodFuncs }}
+{{ range $func := .TemplateDataMethodFuncs }}
 {{ $func }}
 {{end}}
 
 `
 
-var templateMethodFetchByIndexTxt = `func (%s *%s) FetchBy%s(db *gorm.DB) error {
-	if err := db.Where("%s", %s).First(%s).Error; err != nil{
+const templateMethodFetchByIndexTxt = `func ({{var $.ModelName}} *{{$.ModelName}}) FetchBy{{$.FuncName}}(db *gorm.DB) error {
+	if err := db.Where("{{$.WhereStr}}", {{$.FieldStr}}).First({{var $.ModelName}}).Error; err != nil{
 		return err
 	}
 	return nil
 }`
 
-var templateMethodUpdateByIndexWithStructTxt = `func (%s *%s) UpdateBy%sWithStruct(db *gorm.DB) error {
-	if err := db.Model(%s).Where("%s", %s).Updates(%s).Error; err != nil{
+const templateMethodUpdateByIndexWithStructTxt = `func ({{var $.ModelName}} *{{$.ModelName}}) UpdateBy{{$.FuncName}}WithStruct(db *gorm.DB) error {
+	if err := db.Model({{var $.ModelName}}).Where("{{$.WhereStr}}", {{$.FieldStr}}).Updates({{var $.ModelName}}).Error; err != nil{
 		return err
 	}
 	return nil
 }`
 
-var templateMethodUpdateByIndexWithMapTxt = `func (%s *%s) UpdateBy%sWithMap(db *gorm.DB, args map[string]interface{}) error {
-	if err := db.Model(%s).Where("%s", %s).Updates(args).Error; err != nil{
+const templateMethodUpdateByIndexWithMapTxt = `func ({{var $.ModelName}} *{{$.ModelName}}) UpdateBy{{$.FuncName}}WithMap(db *gorm.DB, args map[string]interface{}) error {
+	if err := db.Model({{var $.ModelName}}).Where("{{$.WhereStr}}", {{$.FieldStr}}).Updates(args).Error; err != nil{
 		return err
 	}
 	return nil
 }`
 
-var templateMethodCreateTxt = `func (%s *%s) Create(db *gorm.DB) error {
-	if err := db.Create(%s).Error; err != nil{
+const templateMethodCreateTxt = `func ({{var $.ModelName}} *{{$.ModelName}}) Create(db *gorm.DB) error {
+	if err := db.Create({{var $.ModelName}}).Error; err != nil{
 		return err
 	}
 	return nil
 }`
 
-var templateMethodDeleteTxt = `func (%s *%s) Delete(db *gorm.DB) error {
-	if err := db.Delete(%s).Error; err != nil {
+const templateMethodDeleteTxt = `func ({{var $.ModelName}} *{{$.ModelName}}) Delete(db *gorm.DB) error {
+	if err := db.Delete({{var $.ModelName}}).Error; err != nil {
 		return err
 	}
 	return nil
 }`
 
-var templateMethodFetchListTxt = `func (%s *%s) FetchList(db *gorm.DB, args map[string]interface{})(%s %s, err error) {
-	err = db.Where(args).Find(&%s).Error
+const templateMethodFetchListTxt = `func ({{var $.ModelName}} *{{$.ModelName}}) FetchList(db *gorm.DB, args map[string]interface{})({{$.ConditionStr}}, err error) {
+	err = db.Where(args).Find(&{{var $.ModelName}}).Error
 	return 
 }`
 
-var templateMethodBatchFetchByIndexTxt = `func (%s *%s) BatchFetchBy%s(db *gorm.DB)(%s %s, err error) {
-	err = db.Where("%s", %s).Find(&%s).Error
+const templateMethodBatchFetchByIndexTxt = `func ({{var $.ModelName}} *{{$.ModelName}}) BatchFetchBy{{$.FuncName}}(db *gorm.DB)({{$.ConditionStr}}, err error) {
+	err = db.Where("{{$.WhereStr}}", {{$.FieldStr}}).Find(&{{var $.ModelName}}).Error
 	return 
 }`
 
-var templateMethodBatchFetchByIndexListTxt = `func (%s *%s) BatchFetchBy%sList(db *gorm.DB, %ss []%s)(%s %s, err error) {
-	err = db.Where("%s", %ss).Find(&%s).Error
+const templateMethodBatchFetchByIndexListTxt = `func ({{var $.ModelName}} *{{$.ModelName}}) BatchFetchBy{{$.FuncName}}List(db *gorm.DB, {{var $.UniqFieldName}}s []{{$.UniqFieldType}})({{var $.ModelName}}s []{{$.ModelName}}, err error) {
+	err = db.Where("{{snake $.UniqFieldName}} in (?)", {{var $.UniqFieldName}}s).Find(&{{var $.ModelName}}s).Error
 	return 
 }`
 
-type TemplateGenMethod struct {
-	gen.TemplateGenmodel
-	CommentIndexs          []TemplateGenMethodCommentIndex
-	TemplateGenMethodFuncs []string
+type TemplateDataMethod struct {
+	gen.GenTemplate
+	gen.TemplatePackage
+	gen.TemplateModel
+	TemplateDataMethodFuncs  []string
+	TemplateDataMethodIndexs []TemplateDataMethodIndex
 }
 
-type TemplateGenMethodCommentIndex struct {
+type TemplateDataMethodFunc struct {
+	ModelName     string
+	ModelNames    string
+	FuncName      string
+	WhereStr      string
+	FieldStr      string
+	ConditionStr  string
+	UniqFieldName string
+	UniqFieldType string
+}
+
+type TemplateDataMethodIndex struct {
 	Name   string
 	Type   types.IndexType
-	Fields []gen.TemplateGenStructField
+	Fields []gen.TemplateModelField
 }
 
-func registeTemplateFunc(tms *TemplateGenMethod) {
-	tms.Init()
-	tms.Registe(map[string]interface{}{
-	})
+func (gt *TemplateDataMethod) genFuncName(fields []gen.TemplateModelField) string {
+	str := ""
+	for i, f := range fields {
+		if i == 0 {
+			str = f.Name
+		} else {
+			str += "_And" + f.Name
+		}
+	}
+	return common.ToUpperCamelCase(str)
 }
 
-func (tgm *TemplateGenMethod) joinFields(structName string, fields []gen.TemplateGenStructField) string {
+func (tgm *TemplateDataMethod) joinFields(modelName string, fields []gen.TemplateModelField) string {
 	rs := ""
 	for i, arg := range fields {
 		if i == 0 {
-			rs = fmt.Sprintf("%s.%s", structName, arg.Name)
+			rs = fmt.Sprintf("%s.%s", modelName, arg.Name)
 		} else {
-			rs = fmt.Sprintf("%s, %s.%s", rs, structName, arg.Name)
+			rs = fmt.Sprintf("%s, %s.%s", rs, modelName, arg.Name)
 		}
 	}
 	return rs
 }
 
-func (tgm *TemplateGenMethod) joinWhere(fields []gen.TemplateGenStructField) string {
+func (tgm *TemplateDataMethod) joinWhere(fields []gen.TemplateModelField) string {
 	rs := ""
 	for i, arg := range fields {
-		name := gen.ToLowerSnakeCase(arg.Name)
+		name := common.ToLowerSnakeCase(arg.Name)
 		if i == 0 {
 			rs = fmt.Sprintf("%s=?", name)
 		} else {
@@ -122,7 +141,7 @@ func (tgm *TemplateGenMethod) joinWhere(fields []gen.TemplateGenStructField) str
 	return rs
 }
 
-func (tgm *TemplateGenMethod) joinConditions(fields []gen.TemplateGenStructField) string {
+func (tgm *TemplateDataMethod) joinConditions(fields []gen.TemplateModelField) string {
 	rs := ""
 	for i, arg := range fields {
 		if i == 0 {
@@ -134,7 +153,75 @@ func (tgm *TemplateGenMethod) joinConditions(fields []gen.TemplateGenStructField
 	return rs
 }
 
-func (tgm *TemplateGenMethod) parseLineToTokens(s string) (rs []string, e error) {
+func (tgm *TemplateDataMethod) parseMethodFuncsToTemplate(tp *template.Template, td TemplateDataMethodFunc, templateTxt string, templateName string) (err error) {
+	templateSource := &bytes.Buffer{}
+	tp, err = tp.Parse(templateTxt)
+	if err != nil {
+		return
+	}
+	err = tp.Execute(templateSource, td)
+	if err != nil {
+		return
+	}
+	tgm.TemplateDataMethodFuncs = append(tgm.TemplateDataMethodFuncs, templateSource.String())
+	return nil
+}
+
+func (tgm *TemplateDataMethod) ParseIndexToMethod() error {
+	var err error
+	td := TemplateDataMethodFunc{
+		ModelName:  tgm.ModelName,
+		ModelNames: tgm.ModelName + "s",
+	}
+	tp := template.New("gen method")
+	tp.Funcs(tgm.TemplateMapFuncs)
+	for _, index := range tgm.TemplateDataMethodIndexs {
+		baseFuncName := tgm.genFuncName(index.Fields)
+		joinFields := tgm.joinFields(common.ToLowerCamelCase(tgm.ModelName), index.Fields)
+		joinWhere := tgm.joinWhere(index.Fields)
+		joinConditions := tgm.joinConditions(index.Fields)
+		td = TemplateDataMethodFunc{
+			ModelName:    tgm.ModelName,
+			ModelNames:   tgm.ModelName + "s",
+			FuncName:     baseFuncName,
+			WhereStr:     joinWhere,
+			FieldStr:     joinFields,
+			ConditionStr: joinConditions,
+		}
+		if err = tgm.parseMethodFuncsToTemplate(tp, td, templateMethodFetchByIndexTxt, "templateMethodFetchByIndexTxt"); err != nil {
+			return err
+		}
+		if err = tgm.parseMethodFuncsToTemplate(tp, td, templateMethodUpdateByIndexWithStructTxt, "templateMethodUpdateByIndexWithStructTxt"); err != nil {
+			return err
+		}
+		if err = tgm.parseMethodFuncsToTemplate(tp, td, templateMethodUpdateByIndexWithMapTxt, "templateMethodUpdateByIndexWithMapTxt"); err != nil {
+			return err
+		}
+		if err = tgm.parseMethodFuncsToTemplate(tp, td, templateMethodBatchFetchByIndexTxt, "templateMethodBatchFetchByIndexTxt"); err != nil {
+			return err
+		}
+
+		if (index.Type == types.INDEXTYPE__PRIMARY || index.Type == types.INDEXTYPE__UNIQUE_INDEX) && len(index.Fields) == 1 {
+			td.UniqFieldName = index.Fields[0].Name
+			td.UniqFieldType = index.Fields[0].Type
+			if err = tgm.parseMethodFuncsToTemplate(tp, td, templateMethodBatchFetchByIndexListTxt, "templateMethodBatchFetchByIndexListTxt"); err != nil {
+				return err
+			}
+		}
+	}
+	if err = tgm.parseMethodFuncsToTemplate(tp, td, templateMethodCreateTxt, "templateMethodCreateTxt"); err != nil {
+		return err
+	}
+	if err = tgm.parseMethodFuncsToTemplate(tp, td, templateMethodDeleteTxt, "templateMethodDeleteTxt"); err != nil {
+		return err
+	}
+	if err = tgm.parseMethodFuncsToTemplate(tp, td, templateMethodFetchListTxt, "templateMethodFetchListTxt"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (tm *TemplateDataMethod) parseTagToTokens(s string) (rs []string, e error) {
 	rs = make([]string, 0)
 	tmp := bytes.Buffer{}
 	keyS := false
@@ -165,11 +252,41 @@ func (tgm *TemplateGenMethod) parseLineToTokens(s string) (rs []string, e error)
 	return
 }
 
-func (tgm *TemplateGenMethod) parseDstTree(file *dst.File) error {
-	tgm.PackageName = file.Name.Name
-	if tgm.PackageName == "" {
-		return fmt.Errorf("packageName empty: %v", file.Name)
+func (tm *TemplateDataMethod) parseDecsToIndex(decs dst.Decorations, fieldMap *map[string]gen.TemplateModelField) error {
+	for _, dec := range decs {
+		if strings.Contains(dec, "@def") {
+			arr := strings.Split(dec, " ")
+			if arr[0] == "//" && arr[1] == "@def" {
+				tgmci := TemplateDataMethodIndex{}
+				names := strings.Split(arr[2], ":")
+				if len(names) > 1 {
+					tgmci.Name = names[1]
+				}
+				switch names[0] {
+				case types.INDEXTYPE__PRIMARY.KeyLowerString():
+					tgmci.Type = types.INDEXTYPE__PRIMARY
+				case types.INDEXTYPE__UNIQUE_INDEX.KeyLowerString():
+					tgmci.Type = types.INDEXTYPE__UNIQUE_INDEX
+				case types.INDEXTYPE__INDEX.KeyLowerString():
+					tgmci.Type = types.INDEXTYPE__INDEX
+				default:
+				}
+				tgmci.Fields = make([]gen.TemplateModelField, 0)
+				for i := 3; i < len(arr); i++ {
+					if f, ok := (*fieldMap)[arr[i]]; !ok {
+						return fmt.Errorf("index field of comment def is not struct field: %s", arr[i])
+					} else {
+						tgmci.Fields = append(tgmci.Fields, f)
+					}
+				}
+				tm.TemplateDataMethodIndexs = append(tm.TemplateDataMethodIndexs, tgmci)
+			}
+		}
 	}
+	return nil
+}
+
+func (tm *TemplateDataMethod) ParseDstTree(file *dst.File) error {
 	for _, i := range file.Decls {
 		gd, ok := i.(*dst.GenDecl)
 		if !ok {
@@ -178,17 +295,24 @@ func (tgm *TemplateGenMethod) parseDstTree(file *dst.File) error {
 		if gd.Tok != token.TYPE {
 			continue
 		}
-		tf := gd.Specs[0].(*dst.TypeSpec)
-		if tgm.StructName == "" {
-			tgm.StructName = tf.Name.Name
+		tf, ok := gd.Specs[0].(*dst.TypeSpec)
+		if !ok {
+			return fmt.Errorf("can not change to TypeSpec: %#v", gd.Specs)
+		}
+		if tm.ModelName == "" {
+			tm.ModelName = tf.Name.Name
 		}
 
-		st := tf.Type.(*dst.StructType)
-		for k, field := range st.Fields.List {
-			templateField := gen.TemplateGenStructField{
+		st, ok := tf.Type.(*dst.StructType)
+		if !ok {
+			return fmt.Errorf("can not change to StructType: %#v", tf.Type)
+		}
+
+		fieldMap := map[string]gen.TemplateModelField{}
+		for _, field := range st.Fields.List {
+			templateField := gen.TemplateModelField{
 				Name: field.Names[0].Name,
 				Tag:  field.Tag.Value,
-				Sort: k,
 			}
 
 			if len(field.Decs.NodeDecs.Start) > 0 {
@@ -212,137 +336,44 @@ func (tgm *TemplateGenMethod) parseDstTree(file *dst.File) error {
 				}
 				templateField.Type += "." + ExprType.Sel.Name
 			}
-			tgm.ModelStructFields[templateField.Name] = templateField
+			fieldMap[templateField.Name] = templateField
+			tm.TemplateModelFields = append(tm.TemplateModelFields, templateField)
 		}
 
 		// comment def of struct
 		if gd.Decs.NodeDecs.Start != nil {
 			decs := gd.Decs.NodeDecs.Start
-			for _, dec := range decs {
-				if strings.Contains(dec, "@def") {
-					arr := strings.Split(dec, " ")
-					if arr[0] == "//" && arr[1] == "@def" {
-						tgmci := TemplateGenMethodCommentIndex{}
-						names := strings.Split(arr[2], ":")
-						if len(names) > 1 {
-							tgmci.Name = names[1]
-						}
-						switch names[0] {
-						case types.INDEXTYPE__PRIMARY.KeyLowerString():
-							tgmci.Type = types.INDEXTYPE__PRIMARY
-						case types.INDEXTYPE__UNIQUE_INDEX.KeyLowerString():
-							tgmci.Type = types.INDEXTYPE__UNIQUE_INDEX
-						case types.INDEXTYPE__INDEX.KeyLowerString():
-							tgmci.Type = types.INDEXTYPE__INDEX
-						default:
-						}
-						tgmci.Fields = make([]gen.TemplateGenStructField, 0)
-						for i := 3; i < len(arr); i++ {
-							if f, ok := tgm.ModelStructFields[arr[i]]; !ok {
-								return fmt.Errorf("index field of comment def is not struct field: %s", arr[i])
-							} else {
-								tgmci.Fields = append(tgmci.Fields, f)
-							}
-						}
-						tgm.CommentIndexs = append(tgm.CommentIndexs, tgmci)
-					}
-				}
+			err := tm.parseDecsToIndex(decs, &fieldMap)
+			if err != nil {
+				return err
 			}
 		}
 	}
-
-	// TODO(illidan/2020/9/13):
-	//for _, index := range tgm.CommentIndexs {
-	//	tgmfFetch := gen.TemplateGenmodelFunc{
-	//		Name:           "",
-	//		BelongToStruct: tgm.StructName,
-	//		Args:           index.Fields,
-	//		Returns:        []interface{}{"error"},
-	//	}
-	//	name := ""
-	//	for i2, field := range index.Fields {
-	//		if i2 == 0 {
-	//			name = fmt.Sprintf("%s", field.Name)
-	//		} else {
-	//			name = fmt.Sprintf("%s_%s", name, field.Name)
-	//		}
-	//	}
-	//	tgmfFetch.Name = "FetchBy" + gen.ToUpperCamelCase(name)
-	//	tgm.modelFuncs = append(tgm.modelFuncs, tgmfFetch)
-	//
-	//	if index.Type == types.INDEXTYPE__INDEX {
-	//		tgmfNew := gen.TemplateGenmodelFunc{
-	//			Name:           "",
-	//			BelongToStruct: tgm.StructName,
-	//			Args:           index.Fields,
-	//			Returns:        []interface{}{"error"},
-	//		}
-	//		tgmfNew.Name = "BatchFetchBy" + gen.ToUpperCamelCase(name)
-	//		tgm.modelFuncs = append(tgm.modelFuncs, tgmfNew)
-	//	}
-	//}
-
 	return nil
 }
 
-func (tgm *TemplateGenMethod) parseToMethods() error {
-	structName := gen.ToLowerCamelCase(tgm.StructName)
-	structNames := gen.ToLowerCamelCase(tgm.StructName) + "s"
-	StructNames := tgm.StructName + "s"
-	for _, index := range tgm.CommentIndexs {
-		baseFuncName := tgm.GenFuncName(index.Fields)
-		joinFields := tgm.joinFields(structName, index.Fields)
-		joinWhere := tgm.joinWhere(index.Fields)
-		//joinConditions := tgm.joinConditions(index.Fields)
-		tgmf1 := fmt.Sprintf(templateMethodFetchByIndexTxt, structName, tgm.StructName, baseFuncName, joinWhere, joinFields, structName)
-		tgmf2 := fmt.Sprintf(templateMethodUpdateByIndexWithStructTxt, structName, tgm.StructName, baseFuncName, structName, joinWhere, joinFields, structName)
-		tgmf3 := fmt.Sprintf(templateMethodUpdateByIndexWithMapTxt, structName, tgm.StructName, baseFuncName, structName, joinWhere, joinFields)
-		tgmf4 := fmt.Sprintf(templateMethodBatchFetchByIndexTxt, structName, tgm.StructName, baseFuncName, structNames, StructNames, joinWhere, joinFields, structNames)
-		tgm.TemplateGenMethodFuncs = append(tgm.TemplateGenMethodFuncs, tgmf1, tgmf2, tgmf3, tgmf4)
-		if (index.Type == types.INDEXTYPE__PRIMARY || index.Type == types.INDEXTYPE__UNIQUE_INDEX) && len(index.Fields) == 1 {
-			uniqField := index.Fields[0]
-			tgmf5 := fmt.Sprintf(templateMethodBatchFetchByIndexListTxt, structName, tgm.StructName, baseFuncName, gen.ToLowerCamelCase(uniqField.Name), uniqField.Type, structNames, StructNames, joinWhere, gen.ToLowerCamelCase(uniqField.Name), structNames)
-			tgm.TemplateGenMethodFuncs = append(tgm.TemplateGenMethodFuncs, tgmf5)
-		}
+func (tm *TemplateDataMethod) ParseTemplate(templateTxt string, templateName string, templateData interface{}) (templateSource *bytes.Buffer, e error) {
+	templateSource = &bytes.Buffer{}
+	tp := template.New(templateName)
+	tp.Funcs(tm.TemplateMapFuncs)
+	tp, e = tp.Parse(templateTxt)
+	if e != nil {
+		return
 	}
-	tgmf6 := fmt.Sprintf(templateMethodCreateTxt, structName, tgm.StructName, structName)
-	tgmf7 := fmt.Sprintf(templateMethodDeleteTxt, structName, tgm.StructName, structName)
-	tgmf8 := fmt.Sprintf(templateMethodFetchListTxt, structName, tgm.StructName, structNames, StructNames, structNames)
-	tgm.TemplateGenMethodFuncs = append(tgm.TemplateGenMethodFuncs, tgmf6, tgmf7, tgmf8)
-	return nil
+	e = tp.Execute(templateSource, templateData)
+	return
 }
 
-func (tgm *TemplateGenMethod) Parse(flags CmdGenMethodFlags) error {
-	basePath, _ := filepath.Split(flags.CmdGenmodelFilePath)
-	s := strings.LastIndex(basePath, "/")
-	if s == -1 {
-		return fmt.Errorf("basepath error: %s", basePath)
-	}
-
-	tgm.StructName = flags.CmdGenmodelName
-
-	dstTree, err := tgm.GetDstTree(flags.CmdGenmodelFilePath)
+func (tm *TemplateDataMethod) Parse(filePath string) error {
+	dstTree, err := tm.GetDstTree(filePath)
 	if err != nil {
 		return err
 	}
-	if err = tgm.parseDstTree(dstTree); err != nil {
+	if err = tm.ParseDstTree(dstTree); err != nil {
 		return err
 	}
-	if err = tgm.parseToMethods(); err != nil {
+	if err = tm.ParseIndexToMethod(); err != nil {
 		return err
 	}
-
 	return nil
-}
-
-func (tgm *TemplateGenMethod) ParseTemplate(templateTxt string) (templateSource *bytes.Buffer, e error) {
-	templateSource = bytes.NewBuffer([]byte(""))
-
-	tp := template.New("gen_method")
-	tp.Funcs(tgm.TemplateFuncs)
-	if tp, e = tp.Parse(templateTxt); e != nil {
-		return
-	}
-	e = tp.Execute(templateSource, *tgm)
-	return
 }

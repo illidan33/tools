@@ -1,61 +1,45 @@
 package method
 
 import (
+	"errors"
 	"fmt"
-	"myprojects/tools/gen"
-	"path/filepath"
-	"strings"
+	"myprojects/tools/common"
+	"os"
 )
 
-type CmdGenMethodFlags struct {
-	CmdGenmodelName     string
-	CmdGenmodelFilePath string
-}
+type CmdGenMethod struct{}
 
-var tpData TemplateGenMethod
+func (cgm *CmdGenMethod) CmdHandle() {
+	tpData := TemplateDataMethod{}
+	tpData.InitTemplateFuncs()
 
-func init() {
-	tpData = TemplateGenMethod{
-		TemplateGenmodel: gen.TemplateGenmodel{
-			TemplateGenStruct: gen.TemplateGenStruct{
-				PackageName:   "",
-				PackageList:   map[string]string{},
-				StructName:    "",
-				StructComment: "",
-				TemplateFuncs: map[string]interface{}{},
-			},
-			ModelStructFields: map[string]gen.TemplateGenStructField{},
-		},
-		CommentIndexs: []TemplateGenMethodCommentIndex{},
-		TemplateGenMethodFuncs: []string{},
+	cmdFile, err := tpData.ParseFilePath()
+	if err != nil {
+		panic(err)
 	}
-	registeTemplateFunc(&tpData)
-}
+	exeFilePath, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+	tpData.PackageName = cmdFile.PackageName
 
-func (flags CmdGenMethodFlags) CmdHandle() {
-	var err error
-	flags.CmdGenmodelFilePath, err = filepath.Abs(flags.CmdGenmodelFilePath)
+	filePath := fmt.Sprintf("%s/%s", exeFilePath, cmdFile.CmdFileName)
+	if !common.IsExists(filePath) {
+		panic(errors.New("file not found"))
+	}
+
+	err = tpData.Parse(filePath)
 	if err != nil {
 		panic(err)
 	}
 
-	if !gen.IsExists(flags.CmdGenmodelFilePath) {
-		panic(fmt.Errorf("model file path not exists: %s", flags.CmdGenmodelFilePath))
-	}
-
-	// init template data
-	if err := tpData.Parse(flags); err != nil {
-		panic(err)
-	}
-
-	bf, err := tpData.ParseTemplate(templateMethodTxt)
+	bf, err := tpData.ParseTemplate(templateMethodTxt, tpData.ModelName, tpData)
 	if err != nil {
 		panic(err)
 	}
 
-	basePath, fileName := filepath.Split(flags.CmdGenmodelFilePath)
-	fns := strings.LastIndex(fileName, ".")
-	err = tpData.FormatCodeToFile(fmt.Sprintf("%s/%s_generate.go", basePath, fileName[:fns]), bf)
+	dstFilePath := fmt.Sprintf("%s/%s_generate.go", exeFilePath, common.ToLowerSnakeCase(tpData.ModelName))
+	err = tpData.FormatCodeToFile(dstFilePath, bf)
 	if err != nil {
 		panic(err)
 	}
