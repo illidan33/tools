@@ -27,19 +27,6 @@ func IsDir(path string) bool {
 	return s.IsDir()
 }
 
-// get cmd exe path
-func GetExeFilePath() (exeFilePath string, packageName string, e error) {
-	exeFilePath, e = os.Getwd()
-	if e != nil {
-		return
-	}
-
-	//exeFilePath = "/data/golang/go/src/gotest/gorm_test"
-	ss := strings.LastIndex(exeFilePath, "/")
-	packageName = exeFilePath[ss+1:]
-	return
-}
-
 // all letter of string are upper or not
 func IsUpperLetterString(dstString string) bool {
 	for _, letter := range dstString {

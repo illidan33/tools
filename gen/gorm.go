@@ -213,13 +213,13 @@ func (gt *GormTable) parseLineKey(s string, indexSortNum int) (isLineField bool,
 	}
 	gormIndex := GormIndex{
 		Name:      "",
-		Type:      types.INDEXTYPE__INDEX,
+		Type:      types.INDEX_TYPE__INDEX,
 		Using:     using,
 		Fields:    []GormIndexField{},
 		IndexSort: indexSortNum,
 	}
 	if gt.isPrimaryKey(s) {
-		gormIndex.Type = types.INDEXTYPE__PRIMARY
+		gormIndex.Type = types.INDEX_TYPE__PRIMARY
 		fd := gt.getDataBetweenString(lineStrs[2], "(", ")")
 
 		gt.parseIndexFieldString(&gormIndex, fd)
@@ -240,7 +240,7 @@ func (gt *GormTable) parseLineKey(s string, indexSortNum int) (isLineField bool,
 	}
 
 	if strings.Contains(strings.ToUpper(s), types.SQLCONTENTTYPE__UNIQUE_KEY) {
-		gormIndex.Type = types.INDEXTYPE__UNIQUE_INDEX
+		gormIndex.Type = types.INDEX_TYPE__UNIQUE_INDEX
 	}
 
 	if keyNameInx == 0 {
@@ -474,16 +474,16 @@ func (gt *GormTable) TransformGormToModel(tm *TemplateModel, gormFlags GormFlags
 		}
 		if gormFlags.HasGorm {
 			if gormFlags.IsSimpleGorm {
-				tgsf.Tag = fmt.Sprintf("%s%s:\"column:%s\"", tgsf.Tag, types.MODELTAGTYPE__GORM, field.Name)
+				tgsf.Tag = fmt.Sprintf("%s%s:\"column:%s\"", tgsf.Tag, types.MODEL_TAG_TYPE__GORM, field.Name)
 			} else {
-				tgsf.Tag = fmt.Sprintf("%s%s:\"column:%s;type:%s;%s;default:%s\"", tgsf.Tag, types.MODELTAGTYPE__GORM, field.Name, field.Type, null, field.Default)
+				tgsf.Tag = fmt.Sprintf("%s%s:\"column:%s;type:%s;%s;default:%s\"", tgsf.Tag, types.MODEL_TAG_TYPE__GORM, field.Name, field.Type, null, field.Default)
 			}
 		}
 		if gormFlags.HasJson {
-			tgsf.Tag = fmt.Sprintf("%s %s:\"%s\"", tgsf.Tag, types.MODELTAGTYPE__JSON, common.ToLowerCamelCase(field.Name))
+			tgsf.Tag = fmt.Sprintf("%s %s:\"%s\"", tgsf.Tag, types.MODEL_TAG_TYPE__JSON, common.ToLowerCamelCase(field.Name))
 		}
 		if gormFlags.HasDefault {
-			tgsf.Tag = fmt.Sprintf("%s %s:\"%s\"", tgsf.Tag, types.MODELTAGTYPE__DEFAULT, field.Default)
+			tgsf.Tag = fmt.Sprintf("%s %s:\"%s\"", tgsf.Tag, types.MODEL_TAG_TYPE__DEFAULT, field.Default)
 		}
 
 		tgsf.Tag += "`"
@@ -511,7 +511,7 @@ func (gt *GormTable) TransformGormToModel(tm *TemplateModel, gormFlags GormFlags
 			str := ""
 			for kk, field := range index.Fields {
 				if kk == 0 {
-					if index.Type == types.INDEXTYPE__PRIMARY {
+					if index.Type == types.INDEX_TYPE__PRIMARY {
 						str = fmt.Sprintf("\n// @%s %s %s", types.SQLCONTENTTYPE__DEF, index.Type.KeyLowerString(), common.ToUpperCamelCase(field.Name))
 					} else {
 						str = fmt.Sprintf("\n// @def %s:%s %s", index.Type.KeyLowerString(), index.Name, common.ToUpperCamelCase(field.Name))

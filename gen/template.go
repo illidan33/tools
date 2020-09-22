@@ -17,6 +17,8 @@ type GenTemplate struct {
 	TemplateMapFuncs map[string]interface{}
 }
 
+var DefaultGenTemplate = &GenTemplate{}
+
 type TemplateModel struct {
 	ModelName           string
 	ModelComment        string
@@ -43,6 +45,10 @@ type TemplateGenModelFunc struct {
 	Returns        []TemplateModelField
 }
 
+func init() {
+	DefaultGenTemplate.InitTemplateFuncs()
+}
+
 func (gt *GenTemplate) RegisteTemplateFunc(data map[string]interface{}) {
 	for name, fc := range data {
 		gt.TemplateMapFuncs[name] = fc
@@ -55,7 +61,7 @@ func (gt *GenTemplate) InitTemplateFuncs() {
 	}
 	d := map[string]interface{}{
 		"var":   func(s string) string { return common.ToLowerCamelCase(s) },
-		"type": func(s string) string { return common.ToUpperCamelCase(s) },
+		"type":  func(s string) string { return common.ToUpperCamelCase(s) },
 		"snake": func(s string) string { return common.ToLowerSnakeCase(s) },
 		"printf": func(s string, args ...interface{}) string {
 			return fmt.Sprintf(s, args...)

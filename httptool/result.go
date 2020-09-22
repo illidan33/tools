@@ -1,46 +1,12 @@
-package http
+package httptool
 
 import (
-	"fmt"
-	"reflect"
+	"encoding/json"
 )
 
-type TUnmarshal func(data []byte, v interface{}) error
-
 type Result struct {
-	Err       error
-	Meta      Metadata
-	Data      []byte
-	Unmarshal TUnmarshal
-}
-
-func (r Result) BindMeta(meta Metadata) *Result {
-	for key, values := range r.Meta {
-		meta.Set(key, values...)
-	}
-	return &r
-}
-
-func (r Result) Into(v interface{}) error {
-	if r.Err != nil {
-		return r.Err
-	}
-	if r.Unmarshal == nil {
-		r.Unmarshal = UnmarshalBytes
-	}
-	if len(r.Data) > 0 {
-		err := r.Unmarshal(r.Data, v)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func UnmarshalBytes(data []byte, v interface{}) error {
-	if _, ok := v.(*[]byte); ok {
-		reflect.Indirect(reflect.ValueOf(v)).SetBytes(data)
-		return nil
-	}
-	return fmt.Errorf("target value %#v is not []byte, data: %v", v, data)
+	Code int             `json:"code"`
+	Msg  string          `json:"msg"`
+	Data json.RawMessage `json:"data"`
+	Time int64           `json:"time"`
 }

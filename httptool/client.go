@@ -1,45 +1,75 @@
 package httptool
 
-type IMeta interface {
-	Meta() Metadata
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"github.com/valyala/fasthttp"
+	"time"
+)
+
+type Client struct {
+	// for config
+	Host    string
+	Port    int32
+	Mode    string
+	TimeOut time.Duration
 }
 
-func MetadataMerge(metas ...Metadata) Metadata {
-	m := Metadata{}
-	for _, meta := range metas {
-		m.Merge(meta)
+func (client *Client) initConfig() *Client {
+	if client.Host == "" {
+		client.Host = "127.0.0.1"
 	}
-	return m
-}
-
-type Metadata map[string][]string
-
-func (m Metadata) Merge(metadata Metadata) {
-	for key, values := range metadata {
-		m.Set(key, values...)
+	if client.Port == 0 {
+		client.Port = 80
 	}
-}
-
-func (m Metadata) Add(key, value string) {
-	if values, ok := m[key]; ok {
-		m[key] = append(values, value)
-	} else {
-		m.Set(key, value)
+	if client.Mode == "" {
+		client.Mode = "http"
 	}
-}
-
-func (m Metadata) Set(key string, values ...string) {
-	m[key] = values
-}
-
-func (m Metadata) Has(key string) bool {
-	_, ok := m[key]
-	return ok
-}
-
-func (m Metadata) Get(key string) string {
-	if v := m[key]; len(v) > 0 {
-		return v[0]
+	if client.TimeOut == 0 {
+		client.TimeOut = time.Second * 5
 	}
-	return ""
+	return client
+}
+
+func (client *Client) Request(method string, uri string, req interface{}, res interface{}, headers ...map[string]string) (err error) {
+	client.initConfig()
+	if len(headers) == 0 {
+		headers = []map[string]string{
+			{
+				fasthttp.HeaderContentType: "application/json;charset=utf-8",
+			},
+		}
+	}
+	request := HttpRequest{
+		Url:     fmt.Sprintf("%s://%s/%s", client.Mode, client.Host, uri),
+		Method:  method,
+		Timeout: client.TimeOut,
+		Params:  req,
+	}
+	if len(headers) > 0 {
+		for _, header := range headers {
+			request.AddHeaders(header)
+		}
+	}
+	var body []byte
+	body, err = request.Do()
+	if err != nil {
+		return
+	}
+
+	rs := Result{}
+	err = json.Unmarshal(body, &rs)
+	if err != nil {
+		return err
+	}
+	if rs.Code != 0 {
+		return errors.New(fmt.Sprintf("Code: %d, Msg: %s, Time: %s", rs.Code, rs.Msg, time.Unix(rs.Time, 0).Format("2006-01-02 15:04:05")))
+	}
+
+	err = json.Unmarshal(rs.Data, res)
+	if err != nil {
+		return
+	}
+	return
 }

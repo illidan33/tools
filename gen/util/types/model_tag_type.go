@@ -3,7 +3,7 @@ package types
 type ModelTagType string
 
 const (
-	MODELTAGTYPE__GORM    = "gorm"
-	MODELTAGTYPE__JSON    = "json"
-	MODELTAGTYPE__DEFAULT = "default"
+	MODEL_TAG_TYPE__GORM    = "gorm"
+	MODEL_TAG_TYPE__JSON    = "json"
+	MODEL_TAG_TYPE__DEFAULT = "default"
 )

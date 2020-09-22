@@ -201,7 +201,7 @@ func (tgm *TemplateDataMethod) ParseIndexToMethod() error {
 			return err
 		}
 
-		if (index.Type == types.INDEXTYPE__PRIMARY || index.Type == types.INDEXTYPE__UNIQUE_INDEX) && len(index.Fields) == 1 {
+		if (index.Type == types.INDEX_TYPE__PRIMARY || index.Type == types.INDEX_TYPE__UNIQUE_INDEX) && len(index.Fields) == 1 {
 			td.UniqFieldName = index.Fields[0].Name
 			td.UniqFieldType = index.Fields[0].Type
 			if err = tgm.parseMethodFuncsToTemplate(tp, td, templateMethodBatchFetchByIndexListTxt, "templateMethodBatchFetchByIndexListTxt"); err != nil {
@@ -263,12 +263,12 @@ func (tm *TemplateDataMethod) parseDecsToIndex(decs dst.Decorations, fieldMap *m
 					tgmci.Name = names[1]
 				}
 				switch names[0] {
-				case types.INDEXTYPE__PRIMARY.KeyLowerString():
-					tgmci.Type = types.INDEXTYPE__PRIMARY
-				case types.INDEXTYPE__UNIQUE_INDEX.KeyLowerString():
-					tgmci.Type = types.INDEXTYPE__UNIQUE_INDEX
-				case types.INDEXTYPE__INDEX.KeyLowerString():
-					tgmci.Type = types.INDEXTYPE__INDEX
+				case types.INDEX_TYPE__PRIMARY.KeyLowerString():
+					tgmci.Type = types.INDEX_TYPE__PRIMARY
+				case types.INDEX_TYPE__UNIQUE_INDEX.KeyLowerString():
+					tgmci.Type = types.INDEX_TYPE__UNIQUE_INDEX
+				case types.INDEX_TYPE__INDEX.KeyLowerString():
+					tgmci.Type = types.INDEX_TYPE__INDEX
 				default:
 				}
 				tgmci.Fields = make([]gen.TemplateModelField, 0)
