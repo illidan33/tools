@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"myprojects/tools/common"
 	"myprojects/tools/gen"
 	"myprojects/tools/gen/util/types"
-	"myprojects/tools/httptool"
 	"os"
 	"strings"
 )
@@ -27,50 +27,41 @@ type {{$ModelName}} struct{
 }
 
 {{range $func := $.ClientFuncs}}
-{{$isModel := isModel $func.RequestModel}}
-{{if $isModel}}
-{{if $func.ResponseModel.IsArray}}
+{{$hasReq := isModel $func.RequestModel}}
+{{$hasResp := isModel $func.ResponseModel}}
+{{if $hasResp}}
 // {{$func.Comment}}
-func (c {{$ModelName}}){{$func.Name}}(req {{$func.RequestModel.ModelName}}, headers ...map[string]string)(resp *[]{{$func.ResponseModel.Model.ModelName}}, err error) {
-	resp = &[]{{$func.ResponseModel.Model.ModelName}}{}
-	err = c.Request("{{$func.Method}}", "{{$func.Path}}", req, resp, headers...)
+func (c {{$ModelName}}){{$func.Name}}({{if $hasReq}}req {{$func.RequestModel.ModelName}},{{end}} headers ...map[string]string)(resp *{{$func.ResponseModel.ModelName}}, err error) {
+	resp = &{{$func.ResponseModel.ModelName}}{}
+	err = c.Request("{{$func.Method}}", "{{$func.Path}}", {{if $hasReq}}req{{else}}nil{{end}}, resp, headers...)
 	return
 }
 {{else}}
 // {{$func.Comment}}
-func (c {{$ModelName}}){{$func.Name}}(req {{$func.RequestModel.ModelName}}, headers ...map[string]string)(resp *{{$func.ResponseModel.Model.ModelName}}, err error) {
-	resp = &{{$func.ResponseModel.Model.ModelName}}{}
-	err = c.Request("{{$func.Method}}", "{{$func.Path}}", req, resp, headers...)
+func (c {{$ModelName}}){{$func.Name}}({{if $hasReq}}req {{$func.RequestModel.ModelName}},{{end}} headers ...map[string]string)(err error) {
+	err = c.Request("{{$func.Method}}", "{{$func.Path}}", {{if $hasReq}}req{{else}}nil{{end}}, nil, headers...)
 	return
 }
-{{end}}
-{{else}}
-{{if $func.ResponseModel.IsArray}}
-// {{$func.Comment}}
-func (c {{$ModelName}}){{$func.Name}}(headers ...map[string]string)(resp *[]{{$func.ResponseModel.Model.ModelName}}, err error) {
-	resp = &[]{{$func.ResponseModel.Model.ModelName}}{}
-	err = c.Request("{{$func.Method}}", "{{$func.Path}}", nil, resp, headers...)
-	return
-}
-{{else}}
-// {{$func.Comment}}
-func (c {{$ModelName}}){{$func.Name}}(headers ...map[string]string)(resp *{{$func.ResponseModel.Model.ModelName}}, err error) {
-	resp = &{{$func.ResponseModel.Model.ModelName}}{}
-	err = c.Request("{{$func.Method}}", "{{$func.Path}}", nil, resp, headers...)
-	return
-}
-{{end}}
 {{end}}
 {{end}}
 `
 const templateModelTxt = `package {{ .PackageName }}
+import (
+	"encoding/json"
+)
+
 {{range $model := $.ParamModels}}
 // {{$model.ModelComment}}
+{{$isStruct := isStruct $model}}
+{{if $isStruct}}
 type {{$model.ModelName}} struct {
 	{{ range $value := $model.TemplateModelFields }}
 	{{ $value.Name }} {{ $value.Type }} {{ html $value.Tag }} // {{html $value.Comment }}
 	{{end}}
 }
+{{else}}
+type {{$model.ModelName}} {{$model.Type}}
+{{end}}
 {{end}}
 `
 
@@ -91,7 +82,7 @@ type TemplateGenClientFunc struct {
 	Path           string
 	Method         string
 	RequestModel   gen.TemplateModel
-	ResponseModel  TemplateGenClientFuncReturn
+	ResponseModel  gen.TemplateModel
 }
 
 type TemplateGenClientFuncReturn struct {
@@ -101,6 +92,8 @@ type TemplateGenClientFuncReturn struct {
 
 type GenClientSwagger struct {
 	Info        GenClientSwaggerInfo                `json:"info"`
+	Host        string                              `json:"host"`
+	BasePath    string                              `json:"basePath"`
 	Paths       map[string]map[string]GenClientFunc `json:"paths"`
 	Definitions map[string]GenClientDefinition      `json:"definitions"`
 }
@@ -112,37 +105,57 @@ type GenClientSwaggerInfo struct {
 }
 
 type GenClientDefinition struct {
-	Type       string                       `json:"type"`
-	Properties map[string]map[string]string `json:"properties"`
+	Type       string                                  `json:"type"`
+	Required   []string                                `json:"required"`
+	Properties map[string]GenClientDefinitionPropertie `json:"properties"`
 }
+
 type GenClientDefinitionPropertie struct {
-	Description string `json:"description"`
-	Type        string `json:"type"`
+	Description string                                  `json:"description"`
+	Type        string                                  `json:"type"`
+	Items       GenClientDefinitionItem                 `json:"items"`
+	Properties  map[string]GenClientDefinitionPropertie `json:"properties"`
+}
+
+type GenClientDefinitionItem struct {
+	GenClientFuncRef
+	Type string `json:"type"`
 }
 
 type GenClientFunc struct {
-	Name       string                           `json:"-"`
-	Method     string                           `json:"-"`
-	Path       string                           `json:"-"`
-	Consumes   []string                         `json:"consumes"`
-	Produces   []string                         `json:"produces"`
-	Tags       []string                         `json:"tags"`
-	Summary    string                           `json:"summary"`
-	Parameters []GenClientFuncParam             `json:"parameters"`
-	Responses  map[string]GenClientFuncResponse `json:"responses"`
+	Name        string                           `json:"-"`
+	Method      string                           `json:"-"`
+	Path        string                           `json:"-"`
+	Description string                           `json:"description"`
+	Consumes    []string                         `json:"consumes"`
+	Produces    []string                         `json:"produces"`
+	Tags        []string                         `json:"tags"`
+	Summary     string                           `json:"summary"`
+	OperationId string                           `json:"operationId"`
+	Parameters  []GenClientFuncParam             `json:"parameters"`
+	Responses   map[string]GenClientFuncResponse `json:"responses"`
 }
 
 type GenClientFuncParam struct {
-	Description string            `json:"description"`
-	Name        string            `json:"name"`
-	In          string            `json:"in"`
-	Required    bool              `json:"required"`
-	Schema      map[string]string `json:"schema"`
+	Description string           `json:"description"`
+	Name        string           `json:"name"`
+	In          string           `json:"in"`
+	Required    bool             `json:"required"`
+	Schema      GenClientFuncRef `json:"schema"`
 }
 
 type GenClientFuncResponse struct {
-	Description string                     `json:"description"`
-	Schema      map[string]json.RawMessage `json:"schema"`
+	Description string              `json:"description"`
+	Schema      GenClientFuncSchema `json:"schema"`
+}
+
+type GenClientFuncSchema struct {
+	GenClientDefinitionItem
+	Items GenClientFuncRef `json:"items"`
+}
+
+type GenClientFuncRef struct {
+	Ref string `json:"$ref"`
 }
 
 func (tgc *TemplateGenClient) parseRefModelName(s string) string {
@@ -157,6 +170,69 @@ func (tgc *TemplateGenClient) parseRefModelName(s string) string {
 	return name
 }
 
+func (tgc *TemplateGenClient) transformGoType(s string) string {
+	tp := ""
+	switch types.SwaggerPropertyType(s) {
+	case types.SWAGGER_PROPERTY_TYPE__STRING:
+		tp = "string"
+	case types.SWAGGER_PROPERTY_TYPE__INTEGER:
+		tp = "int64"
+	case types.SWAGGER_PROPERTY_TYPE__BOOLEAN:
+		tp = "bool"
+	default:
+	}
+	return tp
+}
+
+func (tgc *TemplateGenClient) parseDefinitionProperty(modleName string, proName string, pro GenClientDefinitionPropertie) (*gen.TemplateModelField, error) {
+	tp := ""
+	switch types.SwaggerPropertyType(pro.Type) {
+	case types.SWAGGER_PROPERTY_TYPE__STRING, types.SWAGGER_PROPERTY_TYPE__INTEGER, types.SWAGGER_PROPERTY_TYPE__BOOLEAN:
+		tp = tgc.transformGoType(pro.Type)
+	case types.SWAGGER_PROPERTY_TYPE__ARRAY:
+		if pro.Items.Ref != "" {
+			name := pro.Items.Ref
+			s := strings.LastIndex(name, "/")
+			if s != -1 {
+				ss := strings.LastIndex(name[s+1:], ".")
+				if ss != -1 {
+					name = name[s+ss+2:]
+				} else {
+					name = name[s+1:]
+				}
+			}
+			tp = "[]" + name
+		} else if pro.Items.Type != "" {
+			tp = "[]" + tgc.transformGoType(pro.Items.Type)
+		}
+
+	case types.SWAGGER_PROPERTY_TYPE__OBJECT:
+		model := gen.TemplateModel{
+			ModelName:    fmt.Sprintf("%s%s", modleName, common.ToUpperCamelCase(proName)),
+			ModelComment: pro.Description,
+			Type:         "struct",
+		}
+		if len(pro.Properties) > 0 {
+			for proProName, propertie := range pro.Properties {
+				field, err := tgc.parseDefinitionProperty(modleName, proProName, propertie)
+				if err != nil {
+					return nil, err
+				}
+				model.TemplateModelFields = append(model.TemplateModelFields, *field)
+			}
+		}
+
+		tgc.ParamModels = append(tgc.ParamModels, model)
+		tp = model.ModelName
+	}
+	return &gen.TemplateModelField{
+		Name:    common.ToUpperCamelCase(proName),
+		Type:    tp,
+		Tag:     fmt.Sprintf("`json:\"%s\"`", proName),
+		Comment: pro.Description,
+	}, nil
+}
+
 func (tgc *TemplateGenClient) parseDefinitions(defs map[string]GenClientDefinition) error {
 	paramModelsMap := map[string]gen.TemplateModel{}
 	for name, def := range defs {
@@ -166,27 +242,19 @@ func (tgc *TemplateGenClient) parseDefinitions(defs map[string]GenClientDefiniti
 		}
 		f := gen.TemplateModel{
 			ModelName: common.ToUpperCamelCase(name),
+			Type:      "struct",
 		}
-		if def.Type == "object" {
+		switch types.SwaggerPropertyType(def.Type) {
+		case types.SWAGGER_PROPERTY_TYPE__OBJECT:
 			for proName, pro := range def.Properties {
-				if pro["type"] == "object" {
-					name := tgc.parseRefModelName(pro[types.SWAGGER_TYPE__REF])
-					f.TemplateModelFields = append(f.TemplateModelFields, gen.TemplateModelField{
-						Name:    common.ToUpperCamelCase(proName),
-						Type:    name,
-						Tag:     fmt.Sprintf("`json:\"%s\"`", proName),
-						Comment: pro["Description"],
-					})
-				} else {
-					fName := common.ToUpperCamelCase(proName)
-					f.TemplateModelFields = append(f.TemplateModelFields, gen.TemplateModelField{
-						Name:    common.ToUpperCamelCase(fName),
-						Type:    pro["type"],
-						Tag:     fmt.Sprintf("`json:\"%s\"`", proName),
-						Comment: pro["Description"],
-					})
+				field, err := tgc.parseDefinitionProperty(f.ModelName, proName, pro)
+				if err != nil {
+					return err
 				}
+				f.TemplateModelFields = append(f.TemplateModelFields, *field)
 			}
+		default:
+			return errors.New("unknow swagger property type: " + def.Type)
 		}
 		tgc.ParamModels = append(tgc.ParamModels, f)
 		paramModelsMap[f.ModelName] = f
@@ -200,11 +268,15 @@ func (tgc *TemplateGenClient) parseFuncs(funcs []GenClientFunc) error {
 		paramModelsMap[model.ModelName] = model
 	}
 	for _, clientFunc := range funcs {
-		name := clientFunc.Name
-		s := strings.LastIndex(name, "/")
-		if s != -1 {
-			name = name[s+1:]
+		arr := strings.Split(clientFunc.Name, "/")
+		tag := strings.ToLower(clientFunc.Tags[0])
+		if len(arr) == 0 || tag == "" {
+			return errors.New("path empty or tag empty")
 		}
+		if len(arr) < 5 {
+			return errors.New(fmt.Sprintf("format func name error: %#v", arr))
+		}
+		name := strings.Join(arr[4:], "_")
 		f := TemplateGenClientFunc{
 			Name:           common.ToUpperCamelCase(name),
 			Comment:        clientFunc.Summary,
@@ -212,44 +284,53 @@ func (tgc *TemplateGenClient) parseFuncs(funcs []GenClientFunc) error {
 			Path:           clientFunc.Path,
 			Method:         clientFunc.Method,
 			RequestModel:   gen.TemplateModel{},
-			ResponseModel:  TemplateGenClientFuncReturn{},
+			ResponseModel:  gen.TemplateModel{},
 		}
 		for _, parameter := range clientFunc.Parameters {
-			if len(parameter.Schema) > 0 {
-				if ref, ok := parameter.Schema[types.SWAGGER_TYPE__REF]; ok {
-					name := tgc.parseRefModelName(ref)
-					if model, ok := paramModelsMap[name]; ok {
-						f.RequestModel = model
-						break
-					} else {
-						return errors.New("param schema model parse error: " + name)
-					}
-				}
+			name := tgc.parseRefModelName(parameter.Schema.Ref)
+			if model, ok := paramModelsMap[name]; ok {
+				f.RequestModel = model
+				break
+			} else {
+				return errors.New("param schema model parse error: " + name)
 			}
 		}
-		for _, response := range clientFunc.Responses {
-			for k, v := range response.Schema {
-				if k == types.SWAGGER_TYPE__REF {
-					name := tgc.parseRefModelName(string(v))
-					if model, ok := paramModelsMap[name]; ok {
-						f.ResponseModel.Model = model
-					} else {
-						return errors.New("respnse model parse error: " + name)
-					}
-				} else if k == types.SWAGGER_TYPE__ITEMS {
-					data := map[string]string{}
-					err := json.Unmarshal([]byte(v), &data)
-					if err != nil {
-						return err
-					}
-					name := tgc.parseRefModelName(data[types.SWAGGER_TYPE__REF])
-					if model, ok := paramModelsMap[name]; ok {
-						f.ResponseModel.Model = model
-					} else {
-						return errors.New("respnse model parse error: " + name)
-					}
-					f.ResponseModel.IsArray = true
+		for code, response := range clientFunc.Responses {
+			if code != "200" {
+				continue
+			}
+			if response.Schema.Ref != "" {
+				name := tgc.parseRefModelName(response.Schema.Ref)
+				if model, ok := paramModelsMap[name]; ok {
+					f.ResponseModel = model
+				} else {
+					return errors.New("response model parse error: " + name)
 				}
+			} else if response.Schema.Items.Ref != "" {
+				name := tgc.parseRefModelName(response.Schema.Items.Ref)
+				if model, ok := paramModelsMap[name]; ok {
+					tmpModel := gen.TemplateModel{
+						ModelName:           model.ModelName + "s",
+						ModelComment:        "",
+						Type:                "[]" + name,
+						TemplateModelFields: nil,
+					}
+					tgc.ParamModels = append(tgc.ParamModels, tmpModel)
+
+					f.ResponseModel = tmpModel
+				} else {
+					return errors.New("response model parse error: " + name)
+				}
+			} else if response.Schema.Type != "" {
+				tmpModel := gen.TemplateModel{
+					ModelName:           f.Name + "Response",
+					ModelComment:        "",
+					Type:                "json.RawMessage",
+					TemplateModelFields: nil,
+				}
+				tgc.ParamModels = append(tgc.ParamModels, tmpModel)
+
+				f.ResponseModel = tmpModel
 			}
 		}
 		tgc.ClientFuncs = append(tgc.ClientFuncs, f)
@@ -258,18 +339,18 @@ func (tgc *TemplateGenClient) parseFuncs(funcs []GenClientFunc) error {
 }
 
 func (tgc *TemplateGenClient) Parse(url string) error {
-	req := httptool.InitHttpRequest(url)
-	body, err := req.Get()
-	if err != nil {
-		panic(err)
-	}
+	//req := httptool.InitHttpRequest(url)
+	//body, err := req.Get()
+	//if err != nil {
+	//	panic(err)
+	//}
 
 	// for test
-	//file, err := os.Open("/data/golang/go/src/myprojects/tools/example/fpx.json")
-	//if err != nil {
-	//	return err
-	//}
-	//body, _ := ioutil.ReadAll(file)
+	file, err := os.Open("/data/golang/go/src/myprojects/tools/example/clients/gkspg.json")
+	if err != nil {
+		return err
+	}
+	body, _ := ioutil.ReadAll(file)
 
 	data := GenClientSwagger{}
 	err = json.Unmarshal(body, &data)
@@ -315,6 +396,12 @@ func (tgc *TemplateGenClient) ParseTemplateAndFormatToFile(exeFilePath string) e
 				return false
 			}
 			return true
+		},
+		"isStruct": func(m gen.TemplateModel) bool {
+			if m.Type == "struct" {
+				return true
+			}
+			return false
 		},
 	})
 

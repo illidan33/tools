@@ -22,6 +22,7 @@ var DefaultGenTemplate = &GenTemplate{}
 type TemplateModel struct {
 	ModelName           string
 	ModelComment        string
+	Type                string // like []Model or empty
 	TemplateModelFields []TemplateModelField
 }
 

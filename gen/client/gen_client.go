@@ -16,11 +16,11 @@ func (cgc CmdGenClient) CmdHandle() {
 	tpData.InitTemplateFuncs()
 
 	//package:= tpData.ParseFilePath()
-	tpData.PackageName = common.ToLowerSnakeCase("client_" + cgc.CmdGenClientServiceName)
+	tpData.PackageName = common.ToLowerSnakeCase("client_" + common.ToLowerSnakeCase(cgc.CmdGenClientServiceName))
 	tpData.ClientModel.ModelName = common.ToUpperCamelCase(tpData.PackageName)
 
-	//test
-	//cgc.CmdGenClientDocUrl = "http://192.168.1.116:8080/swagger/swagger/doc.json"
+	// test
+	cgc.CmdGenClientDocUrl = "http://192.168.1.116:8080/swagger/swagger/doc.json"
 
 	if cgc.CmdGenClientDocUrl == "" {
 		panic(errors.New("required doc url"))

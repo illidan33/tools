@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/valyala/fasthttp"
+	"reflect"
 	"time"
 )
 
@@ -67,9 +68,17 @@ func (client *Client) Request(method string, uri string, req interface{}, res in
 		return errors.New(fmt.Sprintf("Code: %d, Msg: %s, Time: %s", rs.Code, rs.Msg, time.Unix(rs.Time, 0).Format("2006-01-02 15:04:05")))
 	}
 
-	err = json.Unmarshal(rs.Data, res)
-	if err != nil {
-		return
+	if res != nil {
+		rf := reflect.TypeOf(res)
+		if rf.Kind() == reflect.Struct || rf.Kind() == reflect.Slice || rf.Kind() == reflect.Array {
+			err = json.Unmarshal(rs.Data, res)
+			if err != nil {
+				return
+			}
+		} else {
+			res = rs.Data
+		}
 	}
+
 	return
 }
