@@ -43,4 +43,6 @@ func (cgm *CmdGenMethod) CmdHandle() {
 	if err != nil {
 		panic(err)
 	}
+
+	fmt.Println("Success")
 }

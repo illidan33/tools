@@ -1,19 +1,19 @@
 package types
 
-type SwaggerType string
-
 const (
-	SWAGGER_TYPE__REF   SwaggerType = "$ref"
-	SWAGGER_TYPE__ITEMS             = "items"
-	SWAGGER_TYPE__TYPE              = "type"
+	SWAGGER_TYPE__QUERY        = "query"
+	SWAGGER_TYPE__BODY         = "body"
+	SWAGGER_TYPE__PATH         = "path"
+	SWAGGER_TYPE__HEADER       = "header"
+	SWAGGER_TYPE__COOKIE       = "cookie"
+	SWAGGER_TYPE__SUCCESS_CODE = "200"
 )
 
-type SwaggerPropertyType string
-
 const (
-	SWAGGER_PROPERTY_TYPE__OBJECT  SwaggerPropertyType = "object"
-	SWAGGER_PROPERTY_TYPE__ARRAY                       = "array"
-	SWAGGER_PROPERTY_TYPE__STRING                      = "string"
-	SWAGGER_PROPERTY_TYPE__INTEGER                     = "integer"
-	SWAGGER_PROPERTY_TYPE__BOOLEAN                     = "boolean"
+	SWAGGER_PROPERTY_TYPE__OBJECT  = "object"
+	SWAGGER_PROPERTY_TYPE__ARRAY   = "array"
+	SWAGGER_PROPERTY_TYPE__STRING  = "string"
+	SWAGGER_PROPERTY_TYPE__INTEGER = "integer"
+	SWAGGER_PROPERTY_TYPE__BOOLEAN = "boolean"
+	SWAGGER_PROPERTY_TYPE__NUMBER  = "number"
 )

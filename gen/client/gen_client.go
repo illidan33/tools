@@ -1,7 +1,7 @@
 package client
 
 import (
-	"errors"
+	"fmt"
 	"myprojects/tools/common"
 	"os"
 )
@@ -19,12 +19,6 @@ func (cgc CmdGenClient) CmdHandle() {
 	tpData.PackageName = common.ToLowerSnakeCase("client_" + common.ToLowerSnakeCase(cgc.CmdGenClientServiceName))
 	tpData.ClientModel.ModelName = common.ToUpperCamelCase(tpData.PackageName)
 
-	// test
-	cgc.CmdGenClientDocUrl = "http://192.168.1.116:8080/swagger/swagger/doc.json"
-
-	if cgc.CmdGenClientDocUrl == "" {
-		panic(errors.New("required doc url"))
-	}
 	err := tpData.Parse(cgc.CmdGenClientDocUrl)
 	if err != nil {
 		panic(err)
@@ -39,4 +33,6 @@ func (cgc CmdGenClient) CmdHandle() {
 	if err != nil {
 		panic(err)
 	}
+
+	fmt.Println("Success")
 }
