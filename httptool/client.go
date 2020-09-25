@@ -59,7 +59,7 @@ func (client *Client) parseQueryParams(url string, params map[string]string) str
 			urlAddress = urlAddress + k + "=" + v + "&"
 		}
 	}
-	return urlAddress
+	return strings.Trim(urlAddress, "&")
 }
 
 func (client *Client) parseHeaderParams(headerParams map[string]string, cookieParams map[string]string) (rs map[string]string) {

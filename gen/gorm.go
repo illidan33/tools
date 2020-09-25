@@ -441,62 +441,6 @@ func (gt *GormTable) parseStringToTable(s string) error {
 	return nil
 }
 
-func (gt *GormTable) parseToGormTable(content []byte) error {
-	bf := bufio.NewReader(bytes.NewReader(content))
-
-	fieldSortNum := 0
-	indexSortNum := 0
-	for {
-		//line, err := bf.ReadString('\n')
-		//if err != nil {
-		//	if err == io.EOF {
-		//		break
-		//	}
-		//	return err
-		//}
-		line, _, err := bf.ReadLine()
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return err
-		}
-		ls := strings.Trim(string(line), " ")
-		if len(ls) == 0 {
-			continue
-		}
-		if gt.isCreateTitle(ls) {
-			err = gt.parseLineTableTitle(ls)
-			if err != nil {
-				return err
-			}
-		} else if gt.isEngineEnd(ls) {
-			err = gt.parseEngineEnd(ls)
-			if err != nil {
-				return err
-			}
-		} else if gt.isTableKey(ls) {
-			err := gt.parseLineKey(ls, indexSortNum)
-			if err != nil {
-				return err
-			}
-		} else {
-			fieldSortNum++
-			err = gt.parseLineField(ls, fieldSortNum)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	sort.Slice(gt.Fields, func(i, j int) bool {
-		if gt.Fields[i].ModelSort < gt.Fields[j].ModelSort {
-			return true
-		}
-		return false
-	})
-	return nil
-}
-
 func (gt *GormTableList) Parse(path string, gormFlags GormFlags) ([]TemplateModel, error) {
 	file, err := os.Open(path)
 	if err != nil {

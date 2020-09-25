@@ -17,8 +17,8 @@ var cmdGenClient = &cobra.Command{
 }
 
 func init() {
-	cmdGenClient.Flags().StringVarP(&genClient.CmdGenClientDocUrl, "url", "", "", "(required) generate client from url")
-	cmdGenClient.Flags().StringVarP(&genClient.CmdGenClientServiceName, "client-name", "n", "", "(required) generate client name")
+	cmdGenClient.Flags().StringVarP(&genClient.DocUrl, "url", "", "", "(required) generate client from url")
+	cmdGenClient.Flags().StringVarP(&genClient.ServiceName, "client-name", "n", "", "(required) generate client name")
 
 	cmdGen.AddCommand(cmdGenClient)
 }

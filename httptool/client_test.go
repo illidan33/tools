@@ -28,19 +28,19 @@ func TestClient_Request(t *testing.T) {
 		Port: 8080,
 	}
 
-	//req := ClientTest{
-	//	Id:   "123",
-	//	Type: "bill",
-	//	Param: ClientTestBody{
-	//		ExOrderNo: "ef7d78a5-7af3-4027-bacc-6e4b95f2b283",
-	//		Amount:    1000,
-	//	},
-	//	Debug:     "abcxxx-77e1c83b-7bb0-437b-bc50-a7a58e5660ac",
-	//	RequestId: "77e1c83b-7bb0-437b-bc50-a7a58e5660ac",
-	//}
+	req := ClientTest{
+		Id:   "123",
+		Type: "bill",
+		Param: ClientTestBody{
+			ExOrderNo: "ef7d78a5-7af3-4027-bacc-6e4b95f2b283",
+			Amount:    1000,
+		},
+		Debug:     "abcxxx-77e1c83b-7bb0-437b-bc50-a7a58e5660ac",
+		RequestId: "77e1c83b-7bb0-437b-bc50-a7a58e5660ac",
+	}
 	var body []byte
 	var err error
-	body, err = client.Request("GET", "/fpx/api/v1.0/bank-list", nil)
+	body, err = client.Request("GET", "/fpx/api/v1.0/bank-list", req)
 	if err != nil {
 		t.Fatal(err)
 	}

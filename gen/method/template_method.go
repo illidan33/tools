@@ -19,9 +19,6 @@ package {{ .PackageName }}
 import (
 	"github.com/jinzhu/gorm"
 )
-{{ $ModelNames := printf "%ss" .ModelName }}
-
-type {{$ModelNames}} []{{$.ModelName}}
 
 {{ range $func := .TemplateDataMethodFuncs }}
 {{ $func }}
@@ -64,18 +61,18 @@ const templateMethodDeleteTxt = `func ({{var $.ModelName}} *{{$.ModelName}}) Del
 	return nil
 }`
 
-const templateMethodFetchListTxt = `func ({{var $.ModelName}} *{{$.ModelName}}) FetchList(db *gorm.DB, args map[string]interface{})({{$.ConditionStr}}, err error) {
-	err = db.Where(args).Find(&{{var $.ModelName}}).Error
+const templateMethodFetchListTxt = `func ({{var $.ModelName}} *{{$.ModelName}}) FetchList(db *gorm.DB, size int32, offset int32, args map[string]interface{})({{var $.ModelName}}List []{{$.ModelName}}, count int32, err error) {
+	err = db.Where(args).Offset(offset).Limit(size).Find(&{{var $.ModelName}}).Count(&count).Error
 	return 
 }`
 
-const templateMethodBatchFetchByIndexTxt = `func ({{var $.ModelName}} *{{$.ModelName}}) BatchFetchBy{{$.FuncName}}(db *gorm.DB)({{$.ConditionStr}}, err error) {
-	err = db.Where("{{$.WhereStr}}", {{$.FieldStr}}).Find(&{{var $.ModelName}}).Error
+const templateMethodBatchFetchByIndexTxt = `func ({{var $.ModelName}} *{{$.ModelName}}) BatchFetchBy{{$.FuncName}}(db *gorm.DB)({{var $.ModelName}}List []{{$.ModelName}}, err error) {
+	err = db.Where("{{$.WhereStr}}", {{$.FieldStr}}).Find(&{{var $.ModelName}}List).Error
 	return 
 }`
 
-const templateMethodBatchFetchByIndexListTxt = `func ({{var $.ModelName}} *{{$.ModelName}}) BatchFetchBy{{$.FuncName}}List(db *gorm.DB, {{var $.UniqFieldName}}s []{{$.UniqFieldType}})({{var $.ModelName}}s []{{$.ModelName}}, err error) {
-	err = db.Where("{{snake $.UniqFieldName}} in (?)", {{var $.UniqFieldName}}s).Find(&{{var $.ModelName}}s).Error
+const templateMethodBatchFetchByIndexListTxt = `func ({{var $.ModelName}} *{{$.ModelName}}) BatchFetchBy{{$.FuncName}}List(db *gorm.DB, {{var $.UniqFieldName}}List []{{$.UniqFieldType}})({{var $.ModelName}}List []{{$.ModelName}}, err error) {
+	err = db.Where("{{snake $.UniqFieldName}} in (?)", {{var $.UniqFieldName}}List).Find(&{{var $.ModelName}}List).Error
 	return 
 }`
 
@@ -182,7 +179,7 @@ func (tgm *TemplateDataMethod) ParseIndexToMethod() error {
 		joinConditions := tgm.joinConditions(index.Fields)
 		td = TemplateDataMethodFunc{
 			ModelName:    tgm.ModelName,
-			ModelNames:   tgm.ModelName + "s",
+			ModelNames:   tgm.ModelName + "List",
 			FuncName:     baseFuncName,
 			WhereStr:     joinWhere,
 			FieldStr:     joinFields,

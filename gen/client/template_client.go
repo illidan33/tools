@@ -9,6 +9,7 @@ import (
 	"myprojects/tools/gen/util/types"
 	"myprojects/tools/httptool"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -283,17 +284,16 @@ func (tgc *TemplateGenClient) parseFuncs(funcs []GenClientFunc) error {
 		paramModelsMap[model.ModelName] = model
 	}
 	for _, clientFunc := range funcs {
-		arr := strings.Split(clientFunc.Name, "/")
-		tag := strings.ToLower(clientFunc.Tags[0])
-		if len(arr) == 0 || tag == "" {
-			return errors.New("path empty or tag empty")
+		reg := regexp.MustCompile(`[^a-zA-Z-_0-9/]`)
+		funcName := reg.ReplaceAllString(clientFunc.Name, "")
+
+		if funcName == "" {
+			return errors.New("Definition path empty")
 		}
-		if len(arr) < 5 {
-			return errors.New(fmt.Sprintf("format func name error: %#v", arr))
-		}
-		name := strings.Join(arr[4:], "_")
+		funcName = strings.Trim(funcName, "/")
+		name := common.ToUpperCamelCase(strings.ReplaceAll(funcName, "/", "_"))
 		f := TemplateGenClientFunc{
-			Name:           common.ToUpperCamelCase(name),
+			Name:           name,
 			Comment:        clientFunc.Summary,
 			BelongToStruct: tgc.ClientModel,
 			Path:           clientFunc.Path,
@@ -311,7 +311,7 @@ func (tgc *TemplateGenClient) parseFuncs(funcs []GenClientFunc) error {
 				name = tgc.parseRefModelName(parameter.Schema.Ref)
 			}
 			field := gen.TemplateModelField{
-				Name:    name,
+				Name:    common.ToUpperCamelCase(name),
 				Comment: parameter.Description,
 				Tag:     fmt.Sprintf("`json:\"%s\" in:\"%s\"`", parameter.Name, parameter.In),
 			}
@@ -372,7 +372,7 @@ func (tgc *TemplateGenClient) Parse(url string) error {
 		panic(err)
 	}
 
-	// for test
+	// TODO: for test
 	//file, err := os.Open("/data/golang/go/src/myprojects/tools/example/clients/gkspg-staging.json")
 	//if err != nil {
 	//	return err
@@ -417,6 +417,7 @@ func (tgc *TemplateGenClient) ParseTemplateAndFormatToFile(exeFilePath string) e
 		}
 	}
 
+	tgc.InitTemplateFuncs()
 	tgc.RegisteTemplateFunc(map[string]interface{}{
 		"isModel": func(m gen.TemplateModel) bool {
 			if m.ModelName == "" {

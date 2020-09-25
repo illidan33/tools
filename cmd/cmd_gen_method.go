@@ -16,5 +16,7 @@ var cmdGenMethod = &cobra.Command{
 }
 
 func init() {
+	cmdGenMethod.Flags().StringVarP(&genMethod.ModelName, "name", "", "", "(required) name of source model")
+
 	cmdGen.AddCommand(cmdGenMethod)
 }

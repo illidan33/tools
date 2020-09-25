@@ -1,25 +1,32 @@
 package client
 
 import (
+	"errors"
 	"fmt"
 	"myprojects/tools/common"
 	"os"
 )
 
 type CmdGenClient struct {
-	CmdGenClientDocUrl      string
-	CmdGenClientServiceName string
+	DocUrl      string
+	ServiceName string
 }
 
 func (cgc CmdGenClient) CmdHandle() {
 	tpData := TemplateGenClient{}
-	tpData.InitTemplateFuncs()
+
+	if cgc.DocUrl == "" {
+		panic(errors.New("DocUrl required"))
+	}
+	if cgc.ServiceName == "" {
+		panic(errors.New("ServiceName required"))
+	}
 
 	//package:= tpData.ParseFilePath()
-	tpData.PackageName = common.ToLowerSnakeCase("client_" + common.ToLowerSnakeCase(cgc.CmdGenClientServiceName))
+	tpData.PackageName = "client_" + common.ToLowerSnakeCase(cgc.ServiceName)
 	tpData.ClientModel.ModelName = common.ToUpperCamelCase(tpData.PackageName)
 
-	err := tpData.Parse(cgc.CmdGenClientDocUrl)
+	err := tpData.Parse(cgc.DocUrl)
 	if err != nil {
 		panic(err)
 	}
@@ -34,5 +41,5 @@ func (cgc CmdGenClient) CmdHandle() {
 		panic(err)
 	}
 
-	fmt.Println("Success")
+	fmt.Println(cgc.ServiceName + " Success")
 }

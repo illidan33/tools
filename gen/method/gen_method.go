@@ -7,7 +7,9 @@ import (
 	"os"
 )
 
-type CmdGenMethod struct{}
+type CmdGenMethod struct {
+	ModelName string
+}
 
 func (cgm *CmdGenMethod) CmdHandle() {
 	tpData := TemplateDataMethod{}
@@ -25,12 +27,16 @@ func (cgm *CmdGenMethod) CmdHandle() {
 
 	filePath := fmt.Sprintf("%s/%s", exeFilePath, cmdFile.CmdFileName)
 	if !common.IsExists(filePath) {
-		panic(errors.New("file not found"))
+		panic(errors.New("File not found"))
 	}
 
 	err = tpData.Parse(filePath)
 	if err != nil {
 		panic(err)
+	}
+
+	if tpData.ModelName != cgm.ModelName {
+		panic(errors.New("Struct not found: " + cgm.ModelName))
 	}
 
 	bf, err := tpData.ParseTemplate(templateMethodTxt, tpData.ModelName, tpData)
@@ -44,5 +50,5 @@ func (cgm *CmdGenMethod) CmdHandle() {
 		panic(err)
 	}
 
-	fmt.Println("Success")
+	fmt.Println(cgm.ModelName + " Success")
 }

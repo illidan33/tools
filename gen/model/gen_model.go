@@ -66,7 +66,6 @@ func (cgm *CmdGenModel) CmdHandle() {
 		if err = tpData.FormatCodeToFile(filePath, codeData); err != nil {
 			panic(err)
 		}
+		fmt.Println(tpData.ModelName + " Success")
 	}
-
-	fmt.Println("Success")
 }
