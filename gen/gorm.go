@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"myprojects/tools/common"
 	"myprojects/tools/gen/util/types"
 	"os"
@@ -60,6 +61,8 @@ type GormFlags struct {
 	HasJson      bool
 	HasDefault   bool
 }
+
+type GormTableList []GormTable
 
 var FieldType = map[string]string{
 	"INTEGER":    "int64",
@@ -119,6 +122,13 @@ func (gt *GormTable) isUniqueKey(s string) bool {
 	return false
 }
 
+func (gt *GormTable) isForeignKey(s string) bool {
+	if strings.Contains(strings.ToUpper(s), types.SQLCONTENTTYPE__FOREIGN_KEY) {
+		return true
+	}
+	return false
+}
+
 func (gt *GormTable) isEngineEnd(s string) bool {
 	if strings.Contains(strings.ToUpper(s), types.SQLCONTENTTYPE__ENGINE) {
 		return true
@@ -172,7 +182,7 @@ func (gt *GormTable) parseIndexFieldString(gi *GormIndex, s string) error {
 		fieldsMap[field.Name] = field
 	}
 	for i, f := range arr {
-		f = strings.Trim(strings.Trim(f, " "), "`")
+		f = gt.Trim(f)
 		if v, ok := fieldsMap[f]; ok {
 			v.IsKeyField = true
 			v.KeyName = gi.Name
@@ -191,16 +201,11 @@ func (gt *GormTable) parseIndexFieldString(gi *GormIndex, s string) error {
 	return nil
 }
 
-func (gt *GormTable) parseLineKey(s string, indexSortNum int) (isLineField bool, e error) {
+func (gt *GormTable) parseLineKey(s string, indexSortNum int) (e error) {
+	s = gt.Trim(s)
 	lineStrs, err := gt.parseLineToTokens(s)
 	if err != nil {
 		e = err
-		return
-	}
-
-	// maybe line field
-	if len(lineStrs) > 6 {
-		isLineField = true
 		return
 	}
 
@@ -222,6 +227,13 @@ func (gt *GormTable) parseLineKey(s string, indexSortNum int) (isLineField bool,
 		gormIndex.Type = types.INDEX_TYPE__PRIMARY
 		fd := gt.getDataBetweenString(lineStrs[2], "(", ")")
 
+		gt.parseIndexFieldString(&gormIndex, fd)
+		gt.Indexs = append(gt.Indexs, gormIndex)
+		return
+	} else if gt.isForeignKey(s) {
+		gormIndex.Name = gt.Trim(lineStrs[1])
+		gormIndex.Type = types.INDEX_TYPE__FOREIGN_INDEX
+		fd := gt.getDataBetweenString(lineStrs[4], "(", ")")
 		gt.parseIndexFieldString(&gormIndex, fd)
 		gt.Indexs = append(gt.Indexs, gormIndex)
 		return
@@ -263,6 +275,7 @@ func (gt *GormTable) parseLineKey(s string, indexSortNum int) (isLineField bool,
 }
 
 func (gt *GormTable) parseLineField(s string, sort int) error {
+	s = gt.Trim(s)
 	lineStrs, err := gt.parseLineToTokens(s)
 	if err != nil {
 		return err
@@ -270,10 +283,13 @@ func (gt *GormTable) parseLineField(s string, sort int) error {
 	if len(lineStrs) == 0 {
 		return errors.New("Line string array is empty")
 	}
+	if !strings.Contains(lineStrs[0], "`") {
+		return fmt.Errorf("Parse tokens to field error, first string is not field name: %#v", lineStrs)
+	}
 	gormField := GormField{
 		ModelSort: sort,
 	}
-	gormField.Name = strings.Trim(lineStrs[0], "`")
+	gormField.Name = gt.Trim(lineStrs[0])
 
 	for i := 1; i < len(lineStrs); i++ {
 		if i == 1 {
@@ -322,7 +338,7 @@ func (gt *GormTable) parseLineTableTitle(s string) error {
 	if len(lineStrs) < 3 {
 		return fmt.Errorf("parseLineToTokens error, number not enough: %v", lineStrs)
 	}
-	gt.Name = gt.trimField(lineStrs[2], "`")
+	gt.Name = gt.Trim(lineStrs[2])
 	return nil
 }
 
@@ -338,7 +354,7 @@ func (gt *GormTable) parseEngineEnd(s string) error {
 			case "ENGINE":
 				gt.Engine = str[s+1:]
 			case "CHARSET":
-				gt.Charset = str[s+1:]
+				gt.Charset = gt.Trim(str[s+1:])
 			case "COMMENT":
 				gt.Comment = str[s+1:]
 			case "COLLATE":
@@ -368,21 +384,76 @@ func (gt *GormTable) getDataBetweenString(source string, flag1 string, flag2 str
 	return source[s+1 : e]
 }
 
-func (gt *GormTable) trimField(source string, flag string) string {
-	return strings.Trim(source, flag)
+func (gt *GormTable) Trim(source string) string {
+	source = strings.Trim(source, "\n")
+	source = strings.Trim(source, "\t")
+	source = strings.Trim(source, " ")
+	source = strings.Trim(source, "`")
+	return source
 }
 
-func (gt *GormTable) Parse(path string) error {
-	file, err := os.Open(path)
+func (gt *GormTable) parseStringToTable(s string) error {
+	fieldStart := strings.Index(s, "(")
+	fieldEnd := strings.LastIndex(s, ")")
+	if fieldStart == -1 || fieldEnd == -1 || fieldStart == fieldEnd {
+		return errors.New("Parse field content string error")
+	}
+
+	// parse title
+	err := gt.parseLineTableTitle(s[:fieldStart])
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	err = gt.parseEngineEnd(s[fieldEnd+1:])
+	if err != nil {
+		return err
+	}
+	strStart := fieldStart + 1
+	strEnd := strStart
+	indexSort := 0
+	fieldSort := 0
+	keyStart := false
+	for {
+		if strEnd >= fieldEnd {
+			break
+		}
+		if s[strEnd] != ',' {
+			strEnd++
+		} else {
+			tx := s[strStart:strEnd]
+			if gt.isPrimaryKey(tx) || keyStart {
+				err := gt.parseLineKey(tx, indexSort)
+				if err != nil {
+					return err
+				}
+				indexSort++
+				keyStart = true
+			} else {
+				gt.parseLineField(s[strStart:strEnd], fieldSort)
+				fieldSort++
+			}
 
-	bf := bufio.NewReader(file)
+			strEnd++
+			strStart = strEnd
+		}
+	}
+
+	return nil
+}
+
+func (gt *GormTable) parseToGormTable(content []byte) error {
+	bf := bufio.NewReader(bytes.NewReader(content))
+
 	fieldSortNum := 0
 	indexSortNum := 0
 	for {
+		//line, err := bf.ReadString('\n')
+		//if err != nil {
+		//	if err == io.EOF {
+		//		break
+		//	}
+		//	return err
+		//}
 		line, _, err := bf.ReadLine()
 		if err != nil {
 			if err == io.EOF {
@@ -405,18 +476,9 @@ func (gt *GormTable) Parse(path string) error {
 				return err
 			}
 		} else if gt.isTableKey(ls) {
-			islineField, err := gt.parseLineKey(ls, indexSortNum)
+			err := gt.parseLineKey(ls, indexSortNum)
 			if err != nil {
 				return err
-			}
-			if islineField {
-				fieldSortNum++
-				err = gt.parseLineField(ls, fieldSortNum)
-				if err != nil {
-					return err
-				}
-			} else {
-				indexSortNum++
 			}
 		} else {
 			fieldSortNum++
@@ -432,11 +494,66 @@ func (gt *GormTable) Parse(path string) error {
 		}
 		return false
 	})
-
 	return nil
 }
 
-func (gt *GormTable) TransformGormToModel(tm *TemplateModel, gormFlags GormFlags) (packageList []string, err error) {
+func (gt *GormTableList) Parse(path string, gormFlags GormFlags) ([]TemplateModel, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	content, err := ioutil.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+	bf := bufio.NewReader(bytes.NewReader(content))
+	gormList := make([]GormTable, 0)
+	flag := false
+	tmContent := bytes.Buffer{}
+	for {
+		line, _, err := bf.ReadLine()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, err
+		}
+		var tmp GormTable
+		if tmp.isCreateTitle(string(line)) {
+			flag = true
+			tmContent.Write(line)
+			tmContent.WriteByte('\n')
+		} else if tmp.isEngineEnd(string(line)) {
+			flag = false
+			tmContent.Write(line)
+			tmContent.WriteByte('\n')
+
+			gorm := GormTable{}
+			err = gorm.parseStringToTable(tmContent.String())
+			if err != nil {
+				return nil, err
+			}
+			gormList = append(gormList, gorm)
+			tmContent = bytes.Buffer{}
+		} else if flag {
+			tmContent.Write(line)
+			tmContent.WriteByte('\n')
+		}
+	}
+
+	tms := make([]TemplateModel, 0)
+	for _, gorm := range gormList {
+		tm := TemplateModel{}
+		gorm.transformGormToModel(&tm, gormFlags)
+		tms = append(tms, tm)
+	}
+
+	return tms, nil
+}
+
+func (gt *GormTable) transformGormToModel(tm *TemplateModel, gormFlags GormFlags) (err error) {
 	tm.ModelName = gt.Name
 
 	// fields
@@ -458,9 +575,6 @@ func (gt *GormTable) TransformGormToModel(tm *TemplateModel, gormFlags GormFlags
 			tgsf.Type = v
 			if field.IsUnsigned {
 				tgsf.Type = "u" + tgsf.Type
-			}
-			if tgsf.Type == "time.Time" {
-				packageList = []string{"time"}
 			}
 		} else {
 			err = fmt.Errorf("Field type string not in map: %s", tgsf.Type)
@@ -513,8 +627,8 @@ func (gt *GormTable) TransformGormToModel(tm *TemplateModel, gormFlags GormFlags
 				if kk == 0 {
 					if index.Type == types.INDEX_TYPE__PRIMARY {
 						str = fmt.Sprintf("\n// @%s %s %s", types.SQLCONTENTTYPE__DEF, index.Type.KeyLowerString(), common.ToUpperCamelCase(field.Name))
-					} else {
-						str = fmt.Sprintf("\n// @def %s:%s %s", index.Type.KeyLowerString(), index.Name, common.ToUpperCamelCase(field.Name))
+					} else if index.Type == types.INDEX_TYPE__UNIQUE_INDEX || index.Type == types.INDEX_TYPE__INDEX {
+						str = fmt.Sprintf("\n// @%s %s:%s %s", types.SQLCONTENTTYPE__DEF, index.Type.KeyLowerString(), index.Name, common.ToUpperCamelCase(field.Name))
 					}
 				} else {
 					str = fmt.Sprintf("%s %s", str, common.ToUpperCamelCase(field.Name))

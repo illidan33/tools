@@ -6,10 +6,10 @@ import (
 	"myprojects/tools/common"
 	"myprojects/tools/gen"
 	"os"
+	"strings"
 )
 
 type CmdGenModel struct {
-	ModelName         string
 	DdlFilePath       string
 	WithGormTag       bool
 	WithSimpleGormTag bool
@@ -18,14 +18,10 @@ type CmdGenModel struct {
 }
 
 func (cgm *CmdGenModel) CmdHandle() {
-	tpData := TemplateDataModel{}
-	tpData.InitTemplateFuncs()
-
-	packageFile, err := tpData.ParseFilePath()
+	packageFile, err := common.ParseFilePath()
 	if err != nil {
 		panic(err)
 	}
-	tpData.PackageName = packageFile.PackageName
 
 	rootPath, err := os.Getwd()
 	if err != nil {
@@ -33,37 +29,43 @@ func (cgm *CmdGenModel) CmdHandle() {
 	}
 
 	// parse sql
-	gormTable := gen.GormTable{}
-	err = gormTable.Parse(cgm.DdlFilePath)
-	if err != nil {
-		panic(err)
-	}
-
-	// init template data
 	gormFlags := gen.GormFlags{
 		HasGorm:      cgm.WithGormTag,
 		IsSimpleGorm: cgm.WithSimpleGormTag,
 		HasJson:      cgm.WithJsonTag,
 		HasDefault:   cgm.WithDefaultTag,
 	}
-	tpData.TemplatePackage.PackageList, err = gormTable.TransformGormToModel(&tpData.TemplateModel, gormFlags)
+	gormTable := gen.GormTableList{}
+	rs, err := gormTable.Parse(cgm.DdlFilePath, gormFlags)
 	if err != nil {
 		panic(err)
 	}
 
-	var codeData *bytes.Buffer
-	if codeData, err = tpData.ParseTemplate(templateModelTxt, tpData.ModelName, tpData); err != nil {
-		panic(err)
-	}
+	for _, tpmData := range rs {
+		tpData := TemplateDataModel{
+			GenTemplate: gen.GenTemplate{},
+			TemplatePackage: gen.TemplatePackage{
+				PackageName: packageFile.PackageName,
+				PackageList: map[string]string{},
+			},
+			TemplateModel: tpmData,
+		}
+		for _, field := range tpData.TemplateModelFields {
+			if strings.Contains(field.Type, "time") {
+				tpData.PackageList["time"] = "time"
+			}
+		}
 
-	filename := gormTable.Name
-	if cgm.ModelName != "" {
-		filename = common.ToLowerSnakeCase(cgm.ModelName)
-		tpData.TemplateModel.ModelName = common.ToUpperCamelCase(cgm.ModelName)
-	}
-	filePath := fmt.Sprintf("%s/%s.go", rootPath, common.ToLowerSnakeCase(filename))
-	if err = tpData.FormatCodeToFile(filePath, codeData); err != nil {
-		panic(err)
+		var codeData *bytes.Buffer
+		if codeData, err = tpData.ParseTemplate(templateModelTxt, tpData.ModelName, tpData); err != nil {
+			panic(err)
+		}
+
+		filename := common.ToLowerSnakeCase(tpData.ModelName)
+		filePath := fmt.Sprintf("%s/%s.go", rootPath, filename)
+		if err = tpData.FormatCodeToFile(filePath, codeData); err != nil {
+			panic(err)
+		}
 	}
 
 	fmt.Println("Success")

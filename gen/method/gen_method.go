@@ -13,7 +13,7 @@ func (cgm *CmdGenMethod) CmdHandle() {
 	tpData := TemplateDataMethod{}
 	tpData.InitTemplateFuncs()
 
-	cmdFile, err := tpData.ParseFilePath()
+	cmdFile, err := common.ParseFilePath()
 	if err != nil {
 		panic(err)
 	}

@@ -2,9 +2,30 @@ package common
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"strings"
 )
+
+func ParseFilePath() (path CmdFilePath, err error) {
+	// TODO(illidan/2020/9/25): remove
+	// for test
+	//os.Setenv("GOFILE", "main.go")
+	//os.Setenv("GOPACKAGE", "main")
+
+	path.CmdFileName = os.Getenv("GOFILE")
+	if path.CmdFileName == "" {
+		err = errors.New("fileName empty")
+		return
+	}
+	path.PackageName = os.Getenv("GOPACKAGE")
+
+	if path.PackageName == "" {
+		err = errors.New("packageName empty")
+		return
+	}
+	return
+}
 
 // file/dir is exists or not
 func IsExists(path string) bool {

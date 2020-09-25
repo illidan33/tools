@@ -28,7 +28,7 @@ type TemplateModel struct {
 
 type TemplatePackage struct {
 	PackageName string
-	PackageList []string
+	PackageList map[string]string
 }
 
 type TemplateModelField struct {
@@ -74,24 +74,11 @@ func (gt *GenTemplate) InitTemplateFuncs() {
 	gt.RegisteTemplateFunc(d)
 }
 
-func (gt *GenTemplate) ParseFilePath() (path common.CmdFilePath, err error) {
-	path.CmdFileName = os.Getenv("GOFILE")
-	//path.CmdFileName = "booking.go"
-	if path.CmdFileName == "" {
-		err = errors.New("fileName empty")
-		return
-	}
-	path.PackageName = os.Getenv("GOPACKAGE")
-	// TODO(illidan/2020/9/20): remove
-	//path.PackageName = "main"
-	if path.PackageName == "" {
-		err = errors.New("packageName empty")
-		return
-	}
-	return
-}
-
 func (gt *GenTemplate) ParseTemplate(templateTxt string, templateName string, templateData interface{}) (templateSource *bytes.Buffer, e error) {
+	if len(gt.TemplateMapFuncs) == 0 {
+		gt.InitTemplateFuncs()
+	}
+
 	templateSource = &bytes.Buffer{}
 	tp := template.New(templateName)
 	tp.Funcs(gt.TemplateMapFuncs)

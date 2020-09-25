@@ -16,7 +16,6 @@ var cmdGenModel = &cobra.Command{
 }
 
 func init() {
-	cmdGenModel.Flags().StringVarP(&genModel.ModelName, "model", "m", "", "generate model with name (default with table name)")
 	cmdGenModel.Flags().StringVarP(&genModel.DdlFilePath, "file", "f", "", "(required) generate model from file path")
 	cmdGenModel.Flags().BoolVarP(&genModel.WithGormTag, "gorm", "", true, "generate struct with gorm tag or not")
 	cmdGenModel.Flags().BoolVarP(&genModel.WithSimpleGormTag, "gorm-simple", "", false, "generate struct with simple gorm tag or not")
