@@ -324,7 +324,7 @@ func (tgc *TemplateGenClient) parseFuncs(funcs []GenClientFunc) error {
 		}
 		tgc.ParamModels = append(tgc.ParamModels, f.RequestModel)
 		for code, response := range clientFunc.Responses {
-			if code != types.SWAGGER_TYPE__SUCCESS_CODE {
+			if code != httptool.SWAGGER_TYPE__SUCCESS_CODE {
 				continue
 			}
 			if response.Schema.Ref != "" {

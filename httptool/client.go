@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/valyala/fasthttp"
 	"myprojects/tools/common"
-	"myprojects/tools/gen/util/types"
 	"reflect"
 	"strings"
 	"time"
@@ -36,8 +35,12 @@ func (client *Client) initConfig() *Client {
 	return client
 }
 
+// field in path must be surround whith '{' and '}', like 'id' in "http://xxx/{id}"
 func (client *Client) parsePathParams(uri string, params map[string]string) (url string) {
-	url = fmt.Sprintf("%s://%s/%s", client.Mode, client.Host, uri)
+	if uri != "" && uri[0] != '/' {
+		uri = "/" + uri
+	}
+	url = fmt.Sprintf("%s://%s:%d%s", client.Mode, client.Host, client.Port, uri)
 	if len(params) > 0 {
 		for s, pm := range params {
 			url = strings.ReplaceAll(url, "{"+s+"}", pm)
@@ -48,18 +51,22 @@ func (client *Client) parsePathParams(uri string, params map[string]string) (url
 
 func (client *Client) parseQueryParams(url string, params map[string]string) string {
 	var urlAddress = ""
-	lastCharctor := url[len(url)-1:]
-	if lastCharctor == "?" {
-		urlAddress = url + urlAddress
-	} else {
-		urlAddress = url + "?" + urlAddress
+	if len(params) > 0 {
+		for k, v := range params {
+			if len(k) != 0 && len(v) != 0 {
+				urlAddress = urlAddress + k + "=" + v + "&"
+			}
+		}
+		urlAddress = strings.Trim(urlAddress, "&")
 	}
-	for k, v := range params {
-		if len(k) != 0 && len(v) != 0 {
-			urlAddress = urlAddress + k + "=" + v + "&"
+	if urlAddress != "" {
+		if strings.Contains(url, "?") {
+			url = url + "&" + urlAddress
+		} else {
+			url = url + "?" + urlAddress
 		}
 	}
-	return strings.Trim(urlAddress, "&")
+	return url
 }
 
 func (client *Client) parseHeaderParams(headerParams map[string]string, cookieParams map[string]string) (rs map[string]string) {
@@ -109,15 +116,15 @@ func (client *Client) parseParams(uri string, params interface{}) (newUrl string
 			name = common.ToLowerCamelCase(f.Name)
 		}
 		switch in {
-		case types.SWAGGER_TYPE__BODY:
+		case TAG_TYPE__BODY:
 			req = pmValue.Field(i).Interface()
-		case types.SWAGGER_TYPE__PATH:
+		case TAG_TYPE__PATH:
 			pathParams[name] = pmValue.Field(i).String()
-		case types.SWAGGER_TYPE__QUERY:
+		case TAG_TYPE__QUERY:
 			queryParams[name] = pmValue.Field(i).String()
-		case types.SWAGGER_TYPE__HEADER:
+		case TAG_TYPE__HEADER:
 			headerParams[name] = pmValue.Field(i).String()
-		case types.SWAGGER_TYPE__COOKIE:
+		case TAG_TYPE__COOKIE:
 			cookieParams[name] = pmValue.Field(i).String()
 		default:
 			err = errors.New("field tag has wrong 'in': " + in)
@@ -131,8 +138,11 @@ func (client *Client) parseParams(uri string, params interface{}) (newUrl string
 	return
 }
 
+// Used by all method
+// if has no headers, just put 3 params
 func (client *Client) Request(method string, uri string, req interface{}, headers ...map[string]string) (result []byte, err error) {
 	client.initConfig()
+	method = strings.ToUpper(method)
 
 	var url string
 	headerMap := map[string]string{}
@@ -143,7 +153,7 @@ func (client *Client) Request(method string, uri string, req interface{}, header
 			return
 		}
 	} else {
-		url = fmt.Sprintf("%s://%s/%s", client.Mode, client.Host, uri)
+		url = fmt.Sprintf("%s://%s:%d/%s", client.Mode, client.Host, client.Port, uri)
 	}
 	if _, ok := headerMap[fasthttp.HeaderContentType]; !ok {
 		headerMap[fasthttp.HeaderContentType] = "application/json;charset=utf-8"
@@ -173,24 +183,45 @@ func (client *Client) ParseToResult(body []byte, res interface{}) (err error) {
 	if err != nil {
 		return
 	}
+
+	// Unified handling of error codes
 	if rs.Code != RESULT_SUCCESS {
-		return errors.New(fmt.Sprintf("Code: %d, Msg: %s, Time: %s", rs.Code, rs.Msg, time.Unix(rs.Time, 0).Format("2006-01-02 15:04:05")))
+		return errors.New(fmt.Sprintf("Code: %d, Msg: %s, Time: %d", rs.Code, rs.Msg, rs.Time))
 	}
 
 	if res != nil {
 		rf := reflect.TypeOf(res)
 		if rf.Kind() == reflect.Ptr {
-			rf = rf.Elem()
+			return errors.New("Response need a ptr")
 		}
+		rf = rf.Elem()
 		if rf.Kind() == reflect.Struct || rf.Kind() == reflect.Slice || rf.Kind() == reflect.Array {
 			err = json.Unmarshal(rs.Data, res)
 			if err != nil {
 				return
 			}
 		} else {
-			res = rs.Data
+			rfv := reflect.ValueOf(res)
+			if rfv.CanSet() {
+				newRfv := reflect.ValueOf(rs)
+				rfv.Set(newRfv)
+			} else {
+				return errors.New("Response can not set value")
+			}
 		}
 	}
 
+	return nil
+}
+
+func (client *Client) RequestAndParse(method string, uri string, req interface{}, resp interface{}, headers ...map[string]string) error {
+	body, err := client.Request(method, uri, req, headers...)
+	if err != nil {
+		return err
+	}
+	err = client.ParseToResult(body, resp)
+	if err != nil {
+		return err
+	}
 	return nil
 }
