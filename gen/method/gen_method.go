@@ -9,13 +9,14 @@ import (
 
 type CmdGenMethod struct {
 	ModelName string
+	IsDebug   bool
 }
 
 func (cgm *CmdGenMethod) CmdHandle() {
 	tpData := TemplateDataMethod{}
 	tpData.InitTemplateFuncs()
 
-	cmdFile, err := common.ParseFilePath()
+	cmdFile, err := common.ParseFilePath(cgm.IsDebug)
 	if err != nil {
 		panic(err)
 	}

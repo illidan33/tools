@@ -17,6 +17,7 @@ var cmdGenMethod = &cobra.Command{
 
 func init() {
 	cmdGenMethod.Flags().StringVarP(&genMethod.ModelName, "name", "", "", "(required) name of source model")
+	cmdGenMethod.Flags().BoolVarP(&genMethod.IsDebug, "debug", "", false, "open debug flag,default: false")
 
 	cmdGen.AddCommand(cmdGenMethod)
 }

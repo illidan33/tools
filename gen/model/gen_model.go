@@ -15,10 +15,11 @@ type CmdGenModel struct {
 	WithSimpleGormTag bool
 	WithJsonTag       bool
 	WithDefaultTag    bool
+	IsDebug           bool
 }
 
 func (cgm *CmdGenModel) CmdHandle() {
-	packageFile, err := common.ParseFilePath()
+	packageFile, err := common.ParseFilePath(cgm.IsDebug)
 	if err != nil {
 		panic(err)
 	}
@@ -57,7 +58,14 @@ func (cgm *CmdGenModel) CmdHandle() {
 		}
 
 		var codeData *bytes.Buffer
-		if codeData, err = tpData.ParseTemplate(templateModelTxt, tpData.ModelName, tpData); err != nil {
+		if codeData, err = tpData.ParseTemplate(templateModelTxt, tpData.ModelName, tpData, map[string]interface{}{
+			"hasComment": func(field gen.TemplateModelField) bool {
+				if field.Comment != "" {
+					return true
+				}
+				return false
+			},
+		}); err != nil {
 			panic(err)
 		}
 

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"myprojects/tools/common"
 	"myprojects/tools/gen"
 	"myprojects/tools/gen/util/types"
@@ -365,19 +366,23 @@ func (tgc *TemplateGenClient) parseFuncs(funcs []GenClientFunc) error {
 	return nil
 }
 
-func (tgc *TemplateGenClient) Parse(url string) error {
-	req := httptool.NewHttpRequest(url, nil)
-	body, err := req.SetTimeout(time.Second * 30).Get()
-	if err != nil {
-		panic(err)
+func (tgc *TemplateGenClient) Parse(url string, isDebug bool) error {
+	var body []byte
+	var err error
+	if !isDebug {
+		req := httptool.NewHttpRequest(url, nil)
+		body, err = req.SetTimeout(time.Second * 30).Get()
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		// for test
+		file, err := os.Open("/data/golang/go/src/myprojects/tools/example/clients/gkspg-staging.json")
+		if err != nil {
+			return err
+		}
+		body, _ = ioutil.ReadAll(file)
 	}
-
-	// TODO: for test
-	//file, err := os.Open("/data/golang/go/src/myprojects/tools/example/clients/gkspg-staging.json")
-	//if err != nil {
-	//	return err
-	//}
-	//body, _ := ioutil.ReadAll(file)
 
 	data := GenClientSwagger{}
 	err = json.Unmarshal(body, &data)

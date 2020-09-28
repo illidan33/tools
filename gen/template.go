@@ -74,9 +74,14 @@ func (gt *GenTemplate) InitTemplateFuncs() {
 	gt.RegisteTemplateFunc(d)
 }
 
-func (gt *GenTemplate) ParseTemplate(templateTxt string, templateName string, templateData interface{}) (templateSource *bytes.Buffer, e error) {
+func (gt *GenTemplate) ParseTemplate(templateTxt string, templateName string, templateData interface{}, templateFuncMap ...map[string]interface{}) (templateSource *bytes.Buffer, e error) {
 	if len(gt.TemplateMapFuncs) == 0 {
 		gt.InitTemplateFuncs()
+	}
+	if len(templateFuncMap) > 0 {
+		for _, funcMap := range templateFuncMap {
+			gt.RegisteTemplateFunc(funcMap)
+		}
 	}
 
 	templateSource = &bytes.Buffer{}

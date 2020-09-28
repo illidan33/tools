@@ -13,10 +13,9 @@ import (
 {{html .ModelComment}}
 type {{ type .ModelName }} struct{
 	{{ range $value := $.TemplateModelFields }}
-	{{ $value.Name }} {{ $value.Type }} {{ html $value.Tag }} // {{html $value.Comment }}
+	{{ $value.Name }} {{ $value.Type }} {{ html $value.Tag }} {{if hasComment $value}}// {{html $value.Comment }} {{end}}
 	{{end}}
 }`
-
 
 type TemplateDataModel struct {
 	gen.GenTemplate

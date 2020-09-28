@@ -7,11 +7,12 @@ import (
 	"strings"
 )
 
-func ParseFilePath() (path CmdFilePath, err error) {
-	// TODO(illidan/2020/9/25): remove
-	// for test
-	//os.Setenv("GOFILE", "main.go")
-	//os.Setenv("GOPACKAGE", "main")
+func ParseFilePath(isDebug bool) (path CmdFilePath, err error) {
+	if isDebug {
+		// for test
+		os.Setenv("GOFILE", "main.go")
+		os.Setenv("GOPACKAGE", "main")
+	}
 
 	path.CmdFileName = os.Getenv("GOFILE")
 	if path.CmdFileName == "" {

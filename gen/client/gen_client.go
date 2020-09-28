@@ -10,6 +10,7 @@ import (
 type CmdGenClient struct {
 	DocUrl      string
 	ServiceName string
+	IsDebug     bool
 }
 
 func (cgc CmdGenClient) CmdHandle() {
@@ -26,7 +27,7 @@ func (cgc CmdGenClient) CmdHandle() {
 	tpData.PackageName = "client_" + common.ToLowerSnakeCase(cgc.ServiceName)
 	tpData.ClientModel.ModelName = common.ToUpperCamelCase(tpData.PackageName)
 
-	err := tpData.Parse(cgc.DocUrl)
+	err := tpData.Parse(cgc.DocUrl, cgc.IsDebug)
 	if err != nil {
 		panic(err)
 	}

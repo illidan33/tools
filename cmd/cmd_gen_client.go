@@ -10,15 +10,16 @@ import (
 var genClient client.CmdGenClient
 var cmdGenClient = &cobra.Command{
 	Use:   "client",
-	Short: "generate doc to client",
+	Short: "Generate swagger doc to client",
 	Run: func(cmd *cobra.Command, args []string) {
 		gen.Generate(&genClient)
 	},
 }
 
 func init() {
-	cmdGenClient.Flags().StringVarP(&genClient.DocUrl, "url", "", "", "(required) generate client from url")
-	cmdGenClient.Flags().StringVarP(&genClient.ServiceName, "client-name", "n", "", "(required) generate client name")
+	cmdGenClient.Flags().StringVarP(&genClient.DocUrl, "url", "", "", "(required) Generate client from swagger url")
+	cmdGenClient.Flags().StringVarP(&genClient.ServiceName, "client-name", "n", "", "(required) Generate client name")
+	cmdGenClient.Flags().BoolVarP(&genClient.IsDebug, "debug", "", false, "open debug flag,default: false")
 
 	cmdGen.AddCommand(cmdGenClient)
 }

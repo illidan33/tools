@@ -4,9 +4,9 @@ package types
 
 import "fmt"
 
-const _IndexType_name = "INDEX_TYPE__UNKNOWNINDEX_TYPE__PRIMARYINDEX_TYPE__UNIQUE_INDEXINDEX_TYPE__INDEX"
+const _IndexType_name = "INDEX_TYPE__UNKNOWNINDEX_TYPE__PRIMARYINDEX_TYPE__UNIQUE_INDEXINDEX_TYPE__INDEXINDEX_TYPE__FOREIGN_INDEX"
 
-var _IndexType_index = [...]uint8{0, 19, 38, 62, 79}
+var _IndexType_index = [...]uint8{0, 19, 38, 62, 79, 104}
 
 func (i IndexType) String() string {
 	if i >= IndexType(len(_IndexType_index)-1) {

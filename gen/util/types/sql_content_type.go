@@ -23,3 +23,11 @@ const (
 	SQLCONTENTTYPE__UNSIGNED        = "UNSIGNED"
 	SQLCONTENTTYPE__DEF             = "def"
 )
+
+type GormFieldType uint8
+
+const (
+	GORM_FIELD_TYPE__UNKNOWN GormFieldType = iota
+	GORM_FIELD_TYPE__NULL
+	GORM_FIELD_TYPE__NOT_NULL
+)
