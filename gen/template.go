@@ -96,19 +96,24 @@ func (gt *GenTemplate) ParseTemplate(templateTxt string, templateName string, te
 }
 
 func (gt *GenTemplate) FormatCodeToFile(filePath string, templateData *bytes.Buffer) (err error) {
-	var file *os.File
 	filePath, _ = filepath.Abs(filePath)
+
+	f, e := decorator.Parse(templateData.String())
+	if e != nil {
+		// log template text
+		tmpFile, _ := os.OpenFile(filePath+".tmp", os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
+		defer tmpFile.Close()
+		tmpFile.Write(templateData.Bytes())
+		err = e
+		return
+	}
+
+	var file *os.File
 	file, err = os.OpenFile(filePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
-
-	f, e := decorator.Parse(templateData.String())
-	if e != nil {
-		err = e
-		return
-	}
 	err = decorator.Fprint(file, f)
 	return
 }

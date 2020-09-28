@@ -26,6 +26,13 @@ func (cgm *CmdGenMethod) CmdHandle() {
 	}
 	tpData.PackageName = cmdFile.PackageName
 
+	// for test
+	if cgm.IsDebug {
+		exeFilePath = "./example/model"
+		cmdFile.CmdFileName = common.ToLowerSnakeCase(cgm.ModelName) + ".go"
+		tpData.PackageName = "example"
+	}
+
 	filePath := fmt.Sprintf("%s/%s", exeFilePath, cmdFile.CmdFileName)
 	if !common.IsExists(filePath) {
 		panic(errors.New("File not found"))

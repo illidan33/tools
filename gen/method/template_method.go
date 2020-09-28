@@ -21,7 +21,7 @@ import (
 )
 
 {{ range $func := .TemplateDataMethodFuncs }}
-{{ $func }}
+{{html $func}}
 {{end}}
 
 `
@@ -62,7 +62,7 @@ const templateMethodDeleteTxt = `func ({{var $.ModelName}} *{{$.ModelName}}) Del
 }`
 
 const templateMethodFetchListTxt = `func ({{var $.ModelName}} *{{$.ModelName}}) FetchList(db *gorm.DB, size int32, offset int32, args map[string]interface{})({{var $.ModelName}}List []{{$.ModelName}}, count int32, err error) {
-	err = db.Where(args).Offset(offset).Limit(size).Find(&{{var $.ModelName}}).Count(&count).Error
+	err = db.Where(args).Offset(offset).Limit(size).Find(&{{var $.ModelName}}List).Count(&count).Error
 	return 
 }`
 
@@ -170,9 +170,16 @@ func (tgm *TemplateDataMethod) ParseIndexToMethod() error {
 		ModelName:  tgm.ModelName,
 		ModelNames: tgm.ModelName + "s",
 	}
+	if len(tgm.TemplateMapFuncs) == 0 {
+		tgm.InitTemplateFuncs()
+	}
 	tp := template.New("gen method")
 	tp.Funcs(tgm.TemplateMapFuncs)
 	for _, index := range tgm.TemplateDataMethodIndexs {
+		// TODO(illidan/2020/9/28): foreign index not include
+		if index.Type == types.INDEX_TYPE__FOREIGN_INDEX {
+			continue
+		}
 		baseFuncName := tgm.genFuncName(index.Fields)
 		joinFields := tgm.joinFields(common.ToLowerCamelCase(tgm.ModelName), index.Fields)
 		joinWhere := tgm.joinWhere(index.Fields)
@@ -266,6 +273,8 @@ func (tm *TemplateDataMethod) parseDecsToIndex(decs dst.Decorations, fieldMap *m
 					tgmci.Type = types.INDEX_TYPE__UNIQUE_INDEX
 				case types.INDEX_TYPE__INDEX.KeyLowerString():
 					tgmci.Type = types.INDEX_TYPE__INDEX
+				case types.INDEX_TYPE__FOREIGN_INDEX.KeyLowerString():
+					tgmci.Type = types.INDEX_TYPE__FOREIGN_INDEX
 				default:
 				}
 				tgmci.Fields = make([]gen.TemplateModelField, 0)
@@ -347,18 +356,6 @@ func (tm *TemplateDataMethod) ParseDstTree(file *dst.File) error {
 		}
 	}
 	return nil
-}
-
-func (tm *TemplateDataMethod) ParseTemplate(templateTxt string, templateName string, templateData interface{}) (templateSource *bytes.Buffer, e error) {
-	templateSource = &bytes.Buffer{}
-	tp := template.New(templateName)
-	tp.Funcs(tm.TemplateMapFuncs)
-	tp, e = tp.Parse(templateTxt)
-	if e != nil {
-		return
-	}
-	e = tp.Execute(templateSource, templateData)
-	return
 }
 
 func (tm *TemplateDataMethod) Parse(filePath string) error {
