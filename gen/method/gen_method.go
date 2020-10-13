@@ -25,11 +25,13 @@ func (cgm *CmdGenMethod) CmdHandle() {
 		panic(err)
 	}
 	tpData.PackageName = cmdFile.PackageName
+	tpData.ModelName = cgm.ModelName
 
 	// for test
 	if cgm.IsDebug {
 		exeFilePath = "./example/model"
-		cmdFile.CmdFileName = common.ToLowerSnakeCase(cgm.ModelName) + ".go"
+		//cmdFile.CmdFileName = common.ToLowerSnakeCase(cgm.ModelName) + ".go"
+		cmdFile.CmdFileName = "mp_orders.go"
 		tpData.PackageName = "example"
 	}
 

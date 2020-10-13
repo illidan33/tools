@@ -307,6 +307,8 @@ func (tm *TemplateDataMethod) ParseDstTree(file *dst.File) error {
 		}
 		if tm.ModelName == "" {
 			tm.ModelName = tf.Name.Name
+		} else if tm.ModelName != tf.Name.Name {
+			continue
 		}
 
 		st, ok := tf.Type.(*dst.StructType)
