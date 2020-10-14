@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/dave/dst"
+	"go/importer"
 	"go/token"
+	gotypes "go/types"
 	"myprojects/tools/common"
 	"myprojects/tools/gen"
 	"myprojects/tools/gen/util/types"
+	"os"
 	"strings"
 	"text/template"
 )
@@ -311,41 +314,49 @@ func (tm *TemplateDataMethod) ParseDstTree(file *dst.File) error {
 			continue
 		}
 
-		st, ok := tf.Type.(*dst.StructType)
-		if !ok {
-			return fmt.Errorf("can not change to StructType: %#v", tf.Type)
-		}
-
 		fieldMap := map[string]gen.TemplateModelField{}
-		for _, field := range st.Fields.List {
-			templateField := gen.TemplateModelField{
-				Name: field.Names[0].Name,
-				Tag:  field.Tag.Value,
+		if len(tm.TemplateModelFields) == 0 {
+			st, ok := tf.Type.(*dst.StructType)
+			if !ok {
+				return fmt.Errorf("can not change to StructType: %#v", tf.Type)
 			}
 
-			if len(field.Decs.NodeDecs.Start) > 0 {
-				templateField.Comment = field.Decs.NodeDecs.Start[0]
-			}
-			if len(field.Decs.End) > 0 {
-				templateField.Comment = field.Decs.End[0]
-			}
+			for _, field := range st.Fields.List {
+				templateField := gen.TemplateModelField{}
 
-			IdentType, ok := field.Type.(*dst.Ident)
-			if ok {
-				templateField.Type = IdentType.Name
-			} else {
-				ok = true
-			}
-			ExprType, ok := field.Type.(*dst.SelectorExpr)
-			if ok {
-				ExprXType, ok := ExprType.X.(*dst.Ident)
-				if ok {
-					templateField.Type = ExprXType.Name
+				if len(field.Names) > 0 {
+					templateField.Name = field.Names[0].Name
+					templateField.Tag = field.Tag.Value
 				}
-				templateField.Type += "." + ExprType.Sel.Name
+
+				if len(field.Decs.NodeDecs.Start) > 0 {
+					templateField.Comment = field.Decs.NodeDecs.Start[0]
+				}
+				if len(field.Decs.End) > 0 {
+					templateField.Comment = field.Decs.End[0]
+				}
+
+				IdentType, ok := field.Type.(*dst.Ident)
+				if ok {
+					templateField.Type = IdentType.Name
+				} else {
+					ok = true
+				}
+				ExprType, ok := field.Type.(*dst.SelectorExpr)
+				if ok {
+					ExprXType, ok := ExprType.X.(*dst.Ident)
+					if ok {
+						templateField.Type = ExprXType.Name
+					}
+					templateField.Type += "." + ExprType.Sel.Name
+				}
+				fieldMap[templateField.Name] = templateField
+				tm.TemplateModelFields = append(tm.TemplateModelFields, templateField)
 			}
-			fieldMap[templateField.Name] = templateField
-			tm.TemplateModelFields = append(tm.TemplateModelFields, templateField)
+		} else {
+			for _, field := range tm.TemplateModelFields {
+				fieldMap[field.Name] = field
+			}
 		}
 
 		// comment def of struct
@@ -365,6 +376,10 @@ func (tm *TemplateDataMethod) Parse(filePath string) error {
 	if err != nil {
 		return err
 	}
+	if err = tm.ImportFile(os.Getenv("GOFILE")); err != nil {
+		fmt.Println(err) // 记录错误，不打断，退化到由语法树来解析字段
+	}
+
 	if err = tm.ParseDstTree(dstTree); err != nil {
 		return err
 	}
@@ -372,4 +387,46 @@ func (tm *TemplateDataMethod) Parse(filePath string) error {
 		return err
 	}
 	return nil
+}
+
+func (tm *TemplateDataMethod) ImportFile(filePath string) error {
+	pkg, err := importer.For("source", nil).Import(filePath)
+	if err != nil {
+		return err
+	}
+
+	elem := pkg.Scope().Lookup("ApiItem")
+	strArr := make([]gen.TemplateModelField, 0)
+	if named, ok := elem.Type().(*gotypes.Named); ok {
+		if ts, ok := named.Underlying().(*gotypes.Struct); ok {
+			for i := 0; i < ts.NumFields(); i++ {
+				tmp := tm.parseTypesVar(ts.Field(i), ts.Tag(i))
+				strArr = append(strArr, tmp...)
+			}
+		}
+	}
+	tm.TemplateModelFields = strArr
+	return nil
+}
+
+func (tm *TemplateDataMethod) parseTypesVar(v *gotypes.Var, tag string) []gen.TemplateModelField {
+	if v.Embedded() {
+		t := v.Type()
+		str := make([]gen.TemplateModelField, 0)
+		if ts, ok := t.Underlying().(*gotypes.Struct); ok {
+			for i := 0; i < ts.NumFields(); i++ {
+				tmp := tm.parseTypesVar(ts.Field(i), ts.Tag(i))
+				str = append(str, tmp...)
+			}
+		}
+		return str
+	} else {
+		templateField := gen.TemplateModelField{
+			Name:    v.Name(),
+			Type:    v.Type().String(),
+			Tag:     tag,
+			Comment: "",
+		}
+		return []gen.TemplateModelField{templateField}
+	}
 }
