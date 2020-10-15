@@ -371,12 +371,19 @@ func (tm *TemplateDataMethod) ParseDstTree(file *dst.File) error {
 	return nil
 }
 
-func (tm *TemplateDataMethod) Parse(filePath string) error {
+func (tm *TemplateDataMethod) Parse(filePath string, isDebug bool) error {
 	dstTree, err := tm.GetDstTree(filePath)
 	if err != nil {
 		return err
 	}
-	if err = tm.ImportFile(os.Getenv("GOFILE")); err != nil {
+
+	if isDebug {
+		filePath = strings.TrimPrefix(filePath, "/data/golang/go/src/")
+	} else {
+		filePath = os.Getenv("GOFILE")
+	}
+
+	if err = tm.ImportFile(filePath); err != nil {
 		fmt.Println(err) // 记录错误，不打断，退化到由语法树来解析字段
 	}
 
@@ -395,7 +402,7 @@ func (tm *TemplateDataMethod) ImportFile(filePath string) error {
 		return err
 	}
 
-	elem := pkg.Scope().Lookup("ApiItem")
+	elem := pkg.Scope().Lookup(tm.ModelName)
 	strArr := make([]gen.TemplateModelField, 0)
 	if named, ok := elem.Type().(*gotypes.Named); ok {
 		if ts, ok := named.Underlying().(*gotypes.Struct); ok {

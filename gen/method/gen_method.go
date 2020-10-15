@@ -29,18 +29,15 @@ func (cgm *CmdGenMethod) CmdHandle() {
 
 	// for test
 	if cgm.IsDebug {
-		exeFilePath = "./example/model"
-		//cmdFile.CmdFileName = common.ToLowerSnakeCase(cgm.ModelName) + ".go"
+		os.Setenv("GOFILE", "mp_orders.go")
+		os.Setenv("GOPACKAGE", "model")
+		exeFilePath = "/data/golang/go/src/github.com/illidan33/tools/example/model"
 		cmdFile.CmdFileName = "mp_orders.go"
-		tpData.PackageName = "example"
+		tpData.PackageName = "model"
 	}
 
 	filePath := fmt.Sprintf("%s/%s", exeFilePath, cmdFile.CmdFileName)
-	if !common.IsExists(filePath) {
-		panic(errors.New("File not found"))
-	}
-
-	err = tpData.Parse(filePath)
+	err = tpData.Parse(filePath, cgm.IsDebug)
 	if err != nil {
 		panic(err)
 	}
