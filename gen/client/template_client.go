@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"myprojects/tools/common"
-	"myprojects/tools/gen"
-	"myprojects/tools/gen/util/types"
-	"myprojects/tools/httptool"
+	"github.com/illidan33/tools/common"
+	"github.com/illidan33/tools/gen"
+	"github.com/illidan33/tools/gen/util/types"
+	"github.com/illidan33/tools/httptool"
 	"os"
 	"regexp"
 	"strings"
@@ -377,7 +377,7 @@ func (tgc *TemplateGenClient) Parse(url string, isDebug bool) error {
 		}
 	} else {
 		// for test
-		file, err := os.Open("/data/golang/go/src/myprojects/tools/example/clients/gkspg-staging.json")
+		file, err := os.Open("/data/golang/go/src/github.com/illidan33/tools/example/clients/gkspg-staging.json")
 		if err != nil {
 			return err
 		}

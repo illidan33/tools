@@ -3,8 +3,8 @@ package model
 import (
 	"bytes"
 	"fmt"
-	"myprojects/tools/common"
-	"myprojects/tools/gen"
+	"github.com/illidan33/tools/common"
+	"github.com/illidan33/tools/gen"
 	"os"
 	"strings"
 )

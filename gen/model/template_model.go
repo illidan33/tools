@@ -1,6 +1,6 @@
 package model
 
-import "myprojects/tools/gen"
+import "github.com/illidan33/tools/gen"
 
 const templateModelTxt = `package {{ .PackageName }}
 

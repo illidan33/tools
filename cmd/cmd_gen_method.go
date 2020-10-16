@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
-	"myprojects/tools/gen"
-	"myprojects/tools/gen/method"
+	"github.com/illidan33/tools/gen"
+	"github.com/illidan33/tools/gen/method"
 )
 
 var genMethod method.CmdGenMethod

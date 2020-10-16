@@ -8,7 +8,7 @@ import (
 	"github.com/dave/dst/decorator"
 	"html/template"
 	"io/ioutil"
-	"myprojects/tools/common"
+	"github.com/illidan33/tools/common"
 	"os"
 	"path/filepath"
 )

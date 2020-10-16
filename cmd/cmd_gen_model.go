@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
-	"myprojects/tools/gen"
-	"myprojects/tools/gen/model"
+	"github.com/illidan33/tools/gen"
+	"github.com/illidan33/tools/gen/model"
 )
 
 var genModel model.CmdGenModel

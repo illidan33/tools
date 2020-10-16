@@ -3,7 +3,7 @@ package method
 import (
 	"errors"
 	"fmt"
-	"myprojects/tools/common"
+	"github.com/illidan33/tools/common"
 	"os"
 )
 
@@ -31,7 +31,7 @@ func (cgm *CmdGenMethod) CmdHandle() {
 	if cgm.IsDebug {
 		os.Setenv("GOFILE", "mp_orders.go")
 		os.Setenv("GOPACKAGE", "model")
-		exeFilePath = "/data/golang/go/src/github.com/illidan33/tools/example/model"
+		exeFilePath = os.Getenv("GOPATH") + "/src/github.com/illidan33/tools/example/model"
 		cmdFile.CmdFileName = "mp_orders.go"
 		tpData.PackageName = "model"
 	}

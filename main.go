@@ -1,7 +1,7 @@
 package main
 
 import (
-	"myprojects/tools/cmd"
+	"github.com/illidan33/tools/cmd"
 )
 
 func main() {

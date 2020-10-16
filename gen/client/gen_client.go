@@ -3,7 +3,7 @@ package client
 import (
 	"errors"
 	"fmt"
-	"myprojects/tools/common"
+	"github.com/illidan33/tools/common"
 	"os"
 )
 

@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/dave/dst"
+	"github.com/illidan33/tools/common"
+	"github.com/illidan33/tools/gen"
+	"github.com/illidan33/tools/gen/util/types"
 	"go/importer"
 	"go/token"
 	gotypes "go/types"
-	"myprojects/tools/common"
-	"myprojects/tools/gen"
-	"myprojects/tools/gen/util/types"
 	"os"
 	"strings"
 	"text/template"
@@ -372,21 +372,23 @@ func (tm *TemplateDataMethod) ParseDstTree(file *dst.File) error {
 }
 
 func (tm *TemplateDataMethod) Parse(filePath string, isDebug bool) error {
+	gofile := os.Getenv("GOFILE")
+	importerFilePath := ""
+	if isDebug {
+		importerFilePath = strings.TrimPrefix(filePath, os.Getenv("GOPATH")+"/src/")
+		importerFilePath = strings.TrimSuffix(importerFilePath, gofile)
+	} else {
+		importerFilePath = gofile
+	}
+
+	if err := tm.ImportFile(importerFilePath); err != nil {
+		fmt.Println(err) // 记录错误，不打断，退化到由语法树来解析字段
+	}
+
 	dstTree, err := tm.GetDstTree(filePath)
 	if err != nil {
 		return err
 	}
-
-	if isDebug {
-		filePath = strings.TrimPrefix(filePath, "/data/golang/go/src/")
-	} else {
-		filePath = os.Getenv("GOFILE")
-	}
-
-	if err = tm.ImportFile(filePath); err != nil {
-		fmt.Println(err) // 记录错误，不打断，退化到由语法树来解析字段
-	}
-
 	if err = tm.ParseDstTree(dstTree); err != nil {
 		return err
 	}
