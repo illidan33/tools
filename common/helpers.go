@@ -3,6 +3,7 @@ package common
 import (
 	"bytes"
 	"errors"
+	"go/build"
 	"os"
 	"strings"
 )
@@ -26,6 +27,14 @@ func ParseFilePath(isDebug bool) (path CmdFilePath, err error) {
 		return
 	}
 	return
+}
+
+func GetImportPathName(path string) string {
+	pkg, err := build.ImportDir(path, build.FindOnly)
+	if err != nil {
+		panic(err)
+	}
+	return pkg.ImportPath
 }
 
 // file/dir is exists or not

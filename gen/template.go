@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"github.com/dave/dst"
 	"github.com/dave/dst/decorator"
+	"github.com/illidan33/tools/common"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"html/template"
 	"io/ioutil"
-	"github.com/illidan33/tools/common"
 	"os"
 	"path/filepath"
 )
@@ -101,9 +104,10 @@ func (gt *GenTemplate) FormatCodeToFile(filePath string, templateData *bytes.Buf
 	f, e := decorator.Parse(templateData.String())
 	if e != nil {
 		// log template text
-		tmpFile, _ := os.OpenFile(filePath+".tmp", os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
-		defer tmpFile.Close()
-		tmpFile.Write(templateData.Bytes())
+		//tmpFile, _ := os.OpenFile(filePath+".error.tmp", os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
+		//defer tmpFile.Close()
+		//tmpFile.Write(templateData.Bytes())
+		fmt.Println(templateData.String())
 		err = e
 		return
 	}
@@ -116,6 +120,15 @@ func (gt *GenTemplate) FormatCodeToFile(filePath string, templateData *bytes.Buf
 	defer file.Close()
 	err = decorator.Fprint(file, f)
 	return
+}
+
+func (gt *GenTemplate) GetAstTree(filePath string) (*ast.File, error) {
+	fset := token.NewFileSet()
+	astfile, err := parser.ParseFile(fset, filePath, nil, parser.AllErrors)
+	if err != nil {
+		return nil, err
+	}
+	return astfile, nil
 }
 
 func (gt *GenTemplate) GetDstTree(filePath string) (*dst.File, error) {
