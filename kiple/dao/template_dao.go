@@ -1,18 +1,17 @@
-package method
+package dao
 
 import (
 	"bytes"
 	"errors"
 	"fmt"
 	"github.com/dave/dst"
-	"github.com/dave/dst/decorator"
 	"github.com/illidan33/tools/common"
 	"github.com/illidan33/tools/gen"
 	"github.com/illidan33/tools/gen/util/types"
 	"go/importer"
 	"go/token"
 	gotypes "go/types"
-	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"text/template"
@@ -22,11 +21,14 @@ const templateMethodTxt = `package {{$.PackageName}}
 
 import (
 	"github.com/m2c/kiplestar/kipledb"
+	{{range $pkg := $.PackageList}}
+	"{{html $pkg}}"
+	{{end}}
 )
 
-//go:generate tools kiple method --name UserDao --entity={{$.EntityPath}}
+//go:generate tools kiple interface -i {{$.InterfaceName}} -m {{$.ModelName}}
 type {{$.InterfaceName}} interface {
-	{{range $funcName := $.TemplateDataMethodFuncNames}}
+	{{range $funcName := $.CmdKipleDaoFuncNames}}
 	{{html $funcName}}
 	{{end}}
 }
@@ -41,16 +43,16 @@ type {{$.ModelName}} struct {
 	db *kipledb.KipleDB
 }
 
-{{range $func := .TemplateDataMethodFuncs}}
+{{range $func := .CmdKipleDaoFuncs}}
 {{html $func}}
 {{end}}
 
 `
 
 var templateMethodMap = map[string]string{
-	"FetchBy%s": `func (d *{{$.ModelName}}) {{$.FuncName}}() (*{{$.EntityPackageName}}{{$.EntityName}}, error) {
+	"FetchBy%s": `func (d *{{$.ModelName}}) {{$.FuncName}}({{$.ConditionStr}}) (*{{$.EntityPackageName}}{{$.EntityName}}, error) {
 			entt := {{$.EntityPackageName}}{{$.EntityName}}{}
-			if err := d.db.DB().Model(entt).Where("{{$.WhereStr}}", {{$.FieldStr}}).First(&entt).Error; err != nil{
+			if err := d.db.DB().Model(entt).Where("{{$.WhereStr}}", {{$.ConditionFieldStr}}).First(&entt).Error; err != nil{
 				return nil, err
 			}
 			return &entt, nil
@@ -100,20 +102,7 @@ var templateMethodUniqMap = map[string]string{
 		}`,
 }
 
-type TemplateDataMethod struct {
-	InterfaceName     string
-	EntityPath        string
-	EntityName        string
-	EntityPackageName string
-	gen.GenTemplate
-	gen.TemplatePackage
-	gen.TemplateModel
-	TemplateDataMethodFuncNames []string
-	TemplateDataMethodFuncs     []string
-	TemplateDataMethodIndexs    []TemplateDataMethodIndex
-}
-
-type TemplateDataMethodFunc struct {
+type CmdKipleDaoFunc struct {
 	ModelName         string
 	ModelNames        string
 	EntityName        string
@@ -127,13 +116,13 @@ type TemplateDataMethodFunc struct {
 	UniqFieldType     string
 }
 
-type TemplateDataMethodIndex struct {
+type CmdKipleDaoIndex struct {
 	Name   string
 	Type   types.IndexType
 	Fields []gen.TemplateModelField
 }
 
-func (gt *TemplateDataMethod) genFuncName(fields []gen.TemplateModelField) string {
+func (gt *CmdKipleDao) genFuncName(fields []gen.TemplateModelField) string {
 	str := ""
 	for i, f := range fields {
 		if i == 0 {
@@ -145,7 +134,7 @@ func (gt *TemplateDataMethod) genFuncName(fields []gen.TemplateModelField) strin
 	return common.ToUpperCamelCase(str)
 }
 
-func (tgm *TemplateDataMethod) joinFields(modelName string, fields []gen.TemplateModelField) string {
+func (tgm *CmdKipleDao) joinFields(modelName string, fields []gen.TemplateModelField) string {
 	rs := ""
 	for i, arg := range fields {
 		if i == 0 {
@@ -157,7 +146,7 @@ func (tgm *TemplateDataMethod) joinFields(modelName string, fields []gen.Templat
 	return rs
 }
 
-func (tgm *TemplateDataMethod) joinConditionFields(fields []gen.TemplateModelField) string {
+func (tgm *CmdKipleDao) joinConditionFields(fields []gen.TemplateModelField) string {
 	rs := ""
 	for i, arg := range fields {
 		if i == 0 {
@@ -169,7 +158,7 @@ func (tgm *TemplateDataMethod) joinConditionFields(fields []gen.TemplateModelFie
 	return rs
 }
 
-func (tgm *TemplateDataMethod) joinWhere(fields []gen.TemplateModelField) string {
+func (tgm *CmdKipleDao) joinWhere(fields []gen.TemplateModelField) string {
 	rs := ""
 	for i, arg := range fields {
 		name := common.ToLowerSnakeCase(arg.Name)
@@ -182,7 +171,7 @@ func (tgm *TemplateDataMethod) joinWhere(fields []gen.TemplateModelField) string
 	return rs
 }
 
-func (tgm *TemplateDataMethod) joinConditions(fields []gen.TemplateModelField) string {
+func (tgm *CmdKipleDao) joinConditions(fields []gen.TemplateModelField) string {
 	rs := ""
 	for i, arg := range fields {
 		if i == 0 {
@@ -194,7 +183,7 @@ func (tgm *TemplateDataMethod) joinConditions(fields []gen.TemplateModelField) s
 	return rs
 }
 
-func (tgm *TemplateDataMethod) parseMethodFuncsToTemplate(tp *template.Template, reg *regexp.Regexp, td TemplateDataMethodFunc, templateTxt string) (err error) {
+func (tgm *CmdKipleDao) parseMethodFuncsToTemplate(tp *template.Template, reg *regexp.Regexp, td CmdKipleDaoFunc, templateTxt string) (err error) {
 	templateSource := &bytes.Buffer{}
 	tp, err = tp.Parse(templateTxt)
 	if err != nil {
@@ -205,21 +194,88 @@ func (tgm *TemplateDataMethod) parseMethodFuncsToTemplate(tp *template.Template,
 		return
 	}
 	templateString := templateSource.String()
-	tgm.TemplateDataMethodFuncs = append(tgm.TemplateDataMethodFuncs, templateString)
-	if tgm.TemplateDataMethodFuncNames == nil {
-		tgm.TemplateDataMethodFuncNames = make([]string, 0)
+	tgm.CmdKipleDaoFuncs = append(tgm.CmdKipleDaoFuncs, templateString)
+	if tgm.CmdKipleDaoFuncNames == nil {
+		tgm.CmdKipleDaoFuncNames = make([]string, 0)
 	}
 	s := reg.FindAllStringSubmatch(templateString, -1)
 	if len(s) > 0 && len(s[0]) > 1 {
-		tgm.TemplateDataMethodFuncNames = append(tgm.TemplateDataMethodFuncNames, s[0][1])
+		tgm.CmdKipleDaoFuncNames = append(tgm.CmdKipleDaoFuncNames, s[0][1])
 	}
 
 	return nil
 }
 
-func (tgm *TemplateDataMethod) ParseIndexToMethod() error {
+func (tm *CmdKipleDao) parseTagToTokens(s string) (rs []string, e error) {
+	rs = make([]string, 0)
+	tmp := bytes.Buffer{}
+	keyS := false
+	for i := 0; i < len(s); i++ {
+		if s[i] == ' ' {
+			ts := tmp.String()
+			if keyS {
+				tmp.WriteByte(s[i])
+			} else if ts != "" {
+				rs = append(rs, tmp.String())
+				tmp = bytes.Buffer{}
+			}
+		} else {
+			if s[i] == '"' {
+				if keyS == false {
+					keyS = true
+				} else {
+					keyS = false
+				}
+			}
+			tmp.WriteByte(s[i])
+		}
+	}
+	if tmp.String() != "" {
+		rs = append(rs, tmp.String())
+		tmp = bytes.Buffer{}
+	}
+	return
+}
+
+func (tm *CmdKipleDao) parseDecsToIndex(decs dst.Decorations, fieldMap *map[string]gen.TemplateModelField) error {
+	for _, dec := range decs {
+		if strings.Contains(dec, "@def") {
+			arr := strings.Split(dec, " ")
+			if arr[0] == "//" && arr[1] == "@def" {
+				tgmci := CmdKipleDaoIndex{}
+				names := strings.Split(arr[2], ":")
+				if len(names) > 1 {
+					tgmci.Name = names[1]
+				}
+				switch names[0] {
+				case types.INDEX_TYPE__PRIMARY.KeyLowerString():
+					tgmci.Type = types.INDEX_TYPE__PRIMARY
+				case types.INDEX_TYPE__UNIQUE_INDEX.KeyLowerString():
+					tgmci.Type = types.INDEX_TYPE__UNIQUE_INDEX
+				case types.INDEX_TYPE__INDEX.KeyLowerString():
+					tgmci.Type = types.INDEX_TYPE__INDEX
+				case types.INDEX_TYPE__FOREIGN_INDEX.KeyLowerString():
+					tgmci.Type = types.INDEX_TYPE__FOREIGN_INDEX
+				default:
+				}
+				tgmci.Fields = make([]gen.TemplateModelField, 0)
+				for i := 3; i < len(arr); i++ {
+					if f, ok := (*fieldMap)[arr[i]]; !ok {
+						return fmt.Errorf("index field of comment def is not struct field: %s", arr[i])
+					} else {
+						tgmci.Fields = append(tgmci.Fields, f)
+					}
+				}
+				tm.CmdKipleDaoIndexs = append(tm.CmdKipleDaoIndexs, tgmci)
+			}
+		}
+	}
+	return nil
+}
+
+func (tgm *CmdKipleDao) ParseIndexToMethod() error {
 	var err error
-	td := TemplateDataMethodFunc{
+	td := CmdKipleDaoFunc{
 		ModelName:         tgm.ModelName,
 		ModelNames:        tgm.ModelName + "List",
 		EntityName:        tgm.EntityName,
@@ -236,7 +292,7 @@ func (tgm *TemplateDataMethod) ParseIndexToMethod() error {
 	tp := template.New("kiple method")
 	tp.Funcs(tgm.TemplateMapFuncs)
 	reg := regexp.MustCompile("func \\([^\\(^\\)]*\\) (.*) {")
-	for _, index := range tgm.TemplateDataMethodIndexs {
+	for _, index := range tgm.CmdKipleDaoIndexs {
 		// TODO(illidan/2020/9/28): foreign index not include
 		if index.Type == types.INDEX_TYPE__FOREIGN_INDEX {
 			continue
@@ -277,74 +333,7 @@ func (tgm *TemplateDataMethod) ParseIndexToMethod() error {
 	return nil
 }
 
-func (tm *TemplateDataMethod) parseTagToTokens(s string) (rs []string, e error) {
-	rs = make([]string, 0)
-	tmp := bytes.Buffer{}
-	keyS := false
-	for i := 0; i < len(s); i++ {
-		if s[i] == ' ' {
-			ts := tmp.String()
-			if keyS {
-				tmp.WriteByte(s[i])
-			} else if ts != "" {
-				rs = append(rs, tmp.String())
-				tmp = bytes.Buffer{}
-			}
-		} else {
-			if s[i] == '"' {
-				if keyS == false {
-					keyS = true
-				} else {
-					keyS = false
-				}
-			}
-			tmp.WriteByte(s[i])
-		}
-	}
-	if tmp.String() != "" {
-		rs = append(rs, tmp.String())
-		tmp = bytes.Buffer{}
-	}
-	return
-}
-
-func (tm *TemplateDataMethod) parseDecsToIndex(decs dst.Decorations, fieldMap *map[string]gen.TemplateModelField) error {
-	for _, dec := range decs {
-		if strings.Contains(dec, "@def") {
-			arr := strings.Split(dec, " ")
-			if arr[0] == "//" && arr[1] == "@def" {
-				tgmci := TemplateDataMethodIndex{}
-				names := strings.Split(arr[2], ":")
-				if len(names) > 1 {
-					tgmci.Name = names[1]
-				}
-				switch names[0] {
-				case types.INDEX_TYPE__PRIMARY.KeyLowerString():
-					tgmci.Type = types.INDEX_TYPE__PRIMARY
-				case types.INDEX_TYPE__UNIQUE_INDEX.KeyLowerString():
-					tgmci.Type = types.INDEX_TYPE__UNIQUE_INDEX
-				case types.INDEX_TYPE__INDEX.KeyLowerString():
-					tgmci.Type = types.INDEX_TYPE__INDEX
-				case types.INDEX_TYPE__FOREIGN_INDEX.KeyLowerString():
-					tgmci.Type = types.INDEX_TYPE__FOREIGN_INDEX
-				default:
-				}
-				tgmci.Fields = make([]gen.TemplateModelField, 0)
-				for i := 3; i < len(arr); i++ {
-					if f, ok := (*fieldMap)[arr[i]]; !ok {
-						return fmt.Errorf("index field of comment def is not struct field: %s", arr[i])
-					} else {
-						tgmci.Fields = append(tgmci.Fields, f)
-					}
-				}
-				tm.TemplateDataMethodIndexs = append(tm.TemplateDataMethodIndexs, tgmci)
-			}
-		}
-	}
-	return nil
-}
-
-func (tm *TemplateDataMethod) ParseDstTree(file *dst.File) error {
+func (tm *CmdKipleDao) ParseDstTree(file *dst.File) error {
 	tm.EntityPackageName = file.Name.Name
 	for _, i := range file.Decls {
 		gd, ok := i.(*dst.GenDecl)
@@ -419,67 +408,18 @@ func (tm *TemplateDataMethod) ParseDstTree(file *dst.File) error {
 	return nil
 }
 
-func (tm *TemplateDataMethod) FindInterfaceAndFillMethods(astfile *dst.File, dstFilePath string) (bool, error) {
-	var userdao *dst.TypeSpec
-	flag := false
-	userdaoFuncMap := map[string]bool{}
-	for _, decl := range astfile.Decls {
-		if declv, ok := decl.(*dst.GenDecl); ok {
-			if declv.Tok == token.TYPE {
-				if len(declv.Specs) == 0 {
-					return false, errors.New("GenDecl has no Specs")
-				}
-				if typespec, ok := declv.Specs[0].(*dst.TypeSpec); ok && typespec.Name.Name == tm.ModelName {
-					userdao = typespec
-					flag = true
-					if userdaointerface, ok := userdao.Type.(*dst.InterfaceType); ok {
-						for _, field := range userdaointerface.Methods.List {
-							userdaoFuncMap[field.Names[0].Name] = true
-						}
-					}
-					break
-				}
-			}
-		}
-	}
-	if userdao == nil {
-		return flag, nil
-	}
-	for _, decl := range astfile.Decls {
-		if ffv, ok := decl.(*dst.FuncDecl); ok && ffv.Recv != nil && ffv.Recv.List[0].Names[0].Name == tm.InterfaceName {
-			ffnew := dst.Field{}
-			ffnew.Names = []*dst.Ident{ffv.Name}
-			ffnew.Type = ffv.Type
-			if userdaointerface, ok := userdao.Type.(*dst.InterfaceType); ok {
-				if _, ok := userdaoFuncMap[ffv.Name.Name]; !ok {
-					userdaointerface.Methods.List = append(userdaointerface.Methods.List, &ffnew)
-					userdaoFuncMap[ffv.Name.Name] = true
-				}
-			}
-		}
-	}
-
-	var file *os.File
-	file, err := os.OpenFile(dstFilePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
+func (tm *CmdKipleDao) Parse(path string) error {
+	var err error
+	path, err = filepath.Abs(path)
 	if err != nil {
-		return flag, err
-	}
-	defer file.Close()
-	err = decorator.Fprint(file, astfile)
-	return flag, nil
-}
-
-func (tm *TemplateDataMethod) Parse(filePath string, isDebug bool) error {
-	gofile := os.Getenv("GOFILE")
-	importerFilePath := ""
-	if isDebug {
-		importerFilePath = strings.TrimPrefix(filePath, os.Getenv("GOPATH")+"/src/")
-		importerFilePath = strings.TrimSuffix(importerFilePath, gofile)
-	} else {
-		importerFilePath = gofile
+		panic(errors.New("can not parse source to abs filepath"))
 	}
 
-	dstTree, err := tm.GetDstTree(filePath)
+	projectStartPath := filepath.Dir(filepath.Dir(filepath.Dir(path)))
+	projectEndPath := filepath.Base(path)
+	tm.PackageList["entity"] = strings.TrimSuffix(strings.TrimPrefix(path, projectStartPath+"/"), "/"+projectEndPath)
+
+	dstTree, err := tm.GetDstTree(path)
 	if err != nil {
 		return err
 	}
@@ -492,8 +432,8 @@ func (tm *TemplateDataMethod) Parse(filePath string, isDebug bool) error {
 	return nil
 }
 
-func (tm *TemplateDataMethod) ImportFile(filePath string) error {
-	pkg, err := importer.For("source", nil).Import(filePath)
+func (tm *CmdKipleDao) ImportFile(path string) error {
+	pkg, err := importer.For("source", nil).Import(path)
 	if err != nil {
 		return err
 	}
@@ -512,7 +452,7 @@ func (tm *TemplateDataMethod) ImportFile(filePath string) error {
 	return nil
 }
 
-func (tm *TemplateDataMethod) parseTypesVar(v *gotypes.Var, tag string) []gen.TemplateModelField {
+func (tm *CmdKipleDao) parseTypesVar(v *gotypes.Var, tag string) []gen.TemplateModelField {
 	if v.Embedded() {
 		t := v.Type()
 		str := make([]gen.TemplateModelField, 0)

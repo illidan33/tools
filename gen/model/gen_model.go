@@ -6,6 +6,7 @@ import (
 	"github.com/illidan33/tools/common"
 	"github.com/illidan33/tools/gen"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -19,7 +20,7 @@ type CmdGenModel struct {
 }
 
 func (cgm *CmdGenModel) CmdHandle() {
-	packageFile, err := common.ParseFilePath(cgm.IsDebug)
+	packageFile, err := common.GetGenEnvironmentValues(cgm.IsDebug)
 	if err != nil {
 		panic(err)
 	}
@@ -37,6 +38,9 @@ func (cgm *CmdGenModel) CmdHandle() {
 		HasDefault:   cgm.WithDefaultTag,
 	}
 	gormTable := gen.GormTableList{}
+	if !filepath.IsAbs(cgm.DdlFilePath) {
+		cgm.DdlFilePath = filepath.Join(rootPath, cgm.DdlFilePath)
+	}
 	rs, err := gormTable.Parse(cgm.DdlFilePath, gormFlags)
 	if err != nil {
 		panic(err)

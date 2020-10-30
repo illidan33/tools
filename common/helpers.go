@@ -2,61 +2,8 @@ package common
 
 import (
 	"bytes"
-	"errors"
-	"go/build"
-	"os"
 	"strings"
 )
-
-func ParseFilePath(isDebug bool) (path CmdFilePath, err error) {
-	if isDebug {
-		// for test
-		os.Setenv("GOFILE", "main.go")
-		os.Setenv("GOPACKAGE", "main")
-	}
-
-	path.CmdFileName = os.Getenv("GOFILE")
-	if path.CmdFileName == "" {
-		err = errors.New("fileName empty")
-		return
-	}
-	path.PackageName = os.Getenv("GOPACKAGE")
-
-	if path.PackageName == "" {
-		err = errors.New("packageName empty")
-		return
-	}
-	return
-}
-
-func GetImportPathName(path string) string {
-	pkg, err := build.ImportDir(path, build.FindOnly)
-	if err != nil {
-		panic(err)
-	}
-	return pkg.ImportPath
-}
-
-// file/dir is exists or not
-func IsExists(path string) bool {
-	_, err := os.Stat(path)
-	if err != nil {
-		if os.IsExist(err) {
-			return true
-		}
-		return false
-	}
-	return true
-}
-
-// path is dir or not
-func IsDir(path string) bool {
-	s, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-	return s.IsDir()
-}
 
 // all letter of string are upper or not
 func IsUpperLetterString(dstString string) bool {

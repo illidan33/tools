@@ -23,7 +23,7 @@ func (cgc CmdGenClient) CmdHandle() {
 		panic(errors.New("ServiceName required"))
 	}
 
-	//package:= tpData.ParseFilePath()
+	//package:= tpData.GetGenEnvironmentValues()
 	tpData.PackageName = "client_" + common.ToLowerSnakeCase(cgc.ServiceName)
 	tpData.ClientModel.ModelName = common.ToUpperCamelCase(tpData.PackageName)
 

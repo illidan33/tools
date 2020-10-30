@@ -9,7 +9,6 @@ import (
 )
 {{$filename := var .ModelName}}
 
-//go:generate tools gen method --name={{type .ModelName}}
 {{html .ModelComment}}
 type {{ type .ModelName }} struct{
 	{{ range $value := $.TemplateModelFields }}

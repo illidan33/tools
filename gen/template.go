@@ -122,13 +122,13 @@ func (gt *GenTemplate) FormatCodeToFile(filePath string, templateData *bytes.Buf
 	return
 }
 
-func (gt *GenTemplate) GetAstTree(filePath string) (*ast.File, error) {
+func (gt *GenTemplate) GetAstTree(filePath string) (*token.FileSet, *ast.File, error) {
 	fset := token.NewFileSet()
-	astfile, err := parser.ParseFile(fset, filePath, nil, parser.AllErrors)
+	astfile, err := parser.ParseFile(fset, filePath, nil, parser.ParseComments)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return astfile, nil
+	return fset, astfile, nil
 }
 
 func (gt *GenTemplate) GetDstTree(filePath string) (*dst.File, error) {
@@ -147,10 +147,13 @@ func (gt *GenTemplate) GetDstTree(filePath string) (*dst.File, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(codes) == 0 {
+		return nil, errors.New("file empty")
+	}
 
 	f, err := decorator.Parse(codes)
 	if err != nil {
-		panic(err)
+		return nil, errors.New("decorator parse error: " + err.Error())
 	}
 	return f, nil
 }
