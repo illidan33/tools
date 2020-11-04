@@ -35,12 +35,12 @@ type {{$.InterfaceName}} interface {
 
 func {{$.InterfaceName}}Instance() {{$.InterfaceName}} {
 	return &{{$.ModelName}}{
-		db: nil, // need to replace nil
+		db: kiplestar.GetKipleServerInstance().DB("replace with your db name").DB(),
 	}
 }
 
 type {{$.ModelName}} struct {
-	db *kipledb.KipleDB
+	db *gorm.DB
 }
 
 {{range $func := .CmdKipleDaoFuncs}}
@@ -52,52 +52,52 @@ type {{$.ModelName}} struct {
 var templateMethodMap = map[string]string{
 	"FetchBy%s": `func (d *{{$.ModelName}}) {{$.FuncName}}({{$.ConditionStr}}) (*{{$.EntityPackageName}}{{$.EntityName}}, error) {
 			entt := {{$.EntityPackageName}}{{$.EntityName}}{}
-			if err := d.db.DB().Model(entt).Where("{{$.WhereStr}}", {{$.ConditionFieldStr}}).First(&entt).Error; err != nil{
+			if err := d.db.Model(entt).Where("{{$.WhereStr}}", {{$.ConditionFieldStr}}).First(&entt).Error; err != nil{
 				return nil, err
 			}
 			return &entt, nil
 		}`,
 	"UpdateBy%sWithStruct": `func (d *{{$.ModelName}}) {{$.FuncName}}(entt {{$.EntityPackageName}}{{$.EntityName}}) (error) {
-			if err := d.db.DB().Model(entt).Where("{{$.WhereStr}}", {{$.FieldStr}}).Updates(entt).Error; err != nil{
+			if err := d.db.Model(entt).Where("{{$.WhereStr}}", {{$.FieldStr}}).Updates(entt).Error; err != nil{
 				return err
 			}
 			return nil
 		}`,
 	"UpdateBy%sWithMap": `func (d *{{$.ModelName}}) {{$.FuncName}}(args map[string]interface{}) (error) {
 			entt := {{$.EntityPackageName}}{{$.EntityName}}{}
-			if err := d.db.DB().Model(entt).Where("{{$.WhereStr}}", {{$.FieldStr}}).Updates(args).Error; err != nil{
+			if err := d.db.Model(entt).Where("{{$.WhereStr}}", {{$.FieldStr}}).Updates(args).Error; err != nil{
 				return err
 			}
 			return nil
 		}`,
 	"BatchFetchBy%s": `func (d *{{$.ModelName}}) {{$.FuncName}}({{$.ConditionStr}})(dList []{{$.EntityPackageName}}{{$.EntityName}}, err error) {
-			err = d.db.DB().Where("{{$.WhereStr}}", {{$.ConditionFieldStr}}).Find(&dList).Error
+			err = d.db.Where("{{$.WhereStr}}", {{$.ConditionFieldStr}}).Find(&dList).Error
 			return 
 		}`,
 }
 
 var templateMethodFiedUniqMap = map[string]string{
 	"BatchFetchBy%sList": `func (d *{{$.ModelName}}) {{$.FuncName}}({{var $.UniqFieldName}}List []{{$.UniqFieldType}})(dList []{{$.EntityPackageName}}{{$.EntityName}}, err error) {
-			err = d.db.DB().Where("{{snake $.UniqFieldName}} in (?)", {{var $.UniqFieldName}}List).Find(&dList).Error
+			err = d.db.Where("{{snake $.UniqFieldName}} in (?)", {{var $.UniqFieldName}}List).Find(&dList).Error
 			return 
 		}`,
 }
 
 var templateMethodUniqMap = map[string]string{
 	"Create": `func (d *{{$.ModelName}}) Create(entt {{$.EntityPackageName}}{{$.EntityName}}) (error) {
-			if err := d.db.DB().Create(entt).Error; err != nil{
+			if err := d.db.Create(entt).Error; err != nil{
 				return err
 			}
 			return nil
 		}`,
 	"Delete": `func (d *{{$.ModelName}}) Delete(entt {{$.EntityPackageName}}{{$.EntityName}}) (error) {
-			if err := d.db.DB().Delete(entt).Error; err != nil {
+			if err := d.db.Delete(entt).Error; err != nil {
 				return err
 			}
 			return nil
 		}`,
 	"FetchList": `func (d *{{$.ModelName}}) FetchList(size int32, offset int32, args map[string]interface{})(dList []{{$.EntityPackageName}}{{$.EntityName}}, count int32, err error) {
-			err = d.db.DB().Where(args).Offset(offset).Limit(size).Find(&dList).Count(&count).Error
+			err = d.db.Where(args).Offset(offset).Limit(size).Find(&dList).Count(&count).Error
 			return 
 		}`,
 }

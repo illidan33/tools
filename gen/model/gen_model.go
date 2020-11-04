@@ -74,7 +74,7 @@ func (cgm *CmdGenModel) CmdHandle() {
 		}
 
 		filename := common.ToLowerSnakeCase(tpData.ModelName)
-		filePath := fmt.Sprintf("%s/%s.go", rootPath, filename)
+		filePath := filepath.Join(rootPath, filename+".go")
 		if err = tpData.FormatCodeToFile(filePath, codeData); err != nil {
 			panic(err)
 		}

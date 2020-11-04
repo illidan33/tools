@@ -5,10 +5,10 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"github.com/illidan33/tools/common"
 	"github.com/illidan33/tools/gen/util/types"
+	"io"
+	"io/ioutil"
 	"os"
 	"sort"
 	"strconv"
@@ -605,7 +605,7 @@ func (gt *GormTable) transformGormToModel(tm *TemplateModel, gormFlags GormFlags
 			}
 		}
 		if gormFlags.HasJson {
-			tgsf.Tag = fmt.Sprintf("%s %s:\"%s\"", tgsf.Tag, types.MODEL_TAG_TYPE__JSON, common.ToLowerCamelCase(field.Name))
+			tgsf.Tag = fmt.Sprintf("%s %s:\"%s\"", tgsf.Tag, types.MODEL_TAG_TYPE__JSON, field.Name)
 		}
 		if gormFlags.HasDefault {
 			tgsf.Tag = fmt.Sprintf("%s %s:\"%s\"", tgsf.Tag, types.MODEL_TAG_TYPE__DEFAULT, field.Default)

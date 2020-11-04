@@ -78,6 +78,7 @@ func (tm *CmdKipleInterfaceCheck) FindInterfaceAndFillMethods(fset *token.FileSe
 		return errors.New(fmt.Sprintf("Interface %s not found", tm.InterfaceName))
 	}
 
+	newList := make([]*ast.Field, 0)
 	for i := 0; i < len(dstfile.Decls); i++ {
 		decl := dstfile.Decls[i]
 		if ffv, ok := decl.(*ast.FuncDecl); ok && ffv.Recv != nil {
@@ -91,10 +92,16 @@ func (tm *CmdKipleInterfaceCheck) FindInterfaceAndFillMethods(fset *token.FileSe
 				if _, ok := userdaoFuncMap[ffv.Name.Name]; !ok {
 					interfaceNode.Methods.List = append(interfaceNode.Methods.List, &ffnew)
 					userdaoFuncMap[ffnew.Names[0].Name] = &ffnew
+					newList = append(newList, &ffnew)
+				} else {
+					newList = append(newList, userdaoFuncMap[ffv.Name.Name])
 				}
 			}
 		}
 	}
+
+	interfaceNode.Methods.List = newList
+
 	cmap := ast.NewCommentMap(fset, dstfile, dstfile.Comments)
 	dstfile.Comments = cmap.Filter(dstfile).Comments()
 

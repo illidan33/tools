@@ -57,7 +57,7 @@ func (tpData *CmdKipleDao) CmdHandle() {
 		panic(err)
 	}
 
-	dstFilePath := filepath.Join(environValues.CmdDir, environValues.CmdFileName)
+	dstFilePath := filepath.Join(environValues.CmdDir, common.ToLowerSnakeCase(tpData.InterfaceName)+".go")
 	err = tpData.FormatCodeToFile(dstFilePath, bf)
 	if err != nil {
 		panic(err)
