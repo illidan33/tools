@@ -97,7 +97,11 @@ var templateMethodUniqMap = map[string]string{
 			return nil
 		}`,
 	"FetchList": `func (d *{{$.ModelName}}) FetchList(size int32, offset int32, args map[string]interface{})(dList []{{$.EntityPackageName}}{{$.EntityName}}, count int32, err error) {
-			err = d.db.Where(args).Offset(offset).Limit(size).Find(&dList).Count(&count).Error
+			if size == -1 {
+				err = d.db.Where(args).Offset(offset).Find(&dList).Count(&count).Error
+			} else {
+				err = d.db.Where(args).Offset(offset).Limit(size).Find(&dList).Count(&count).Error
+			}			
 			return 
 		}`,
 }
