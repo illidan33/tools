@@ -2,7 +2,6 @@ package dao
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"github.com/dave/dst"
 	"github.com/illidan33/tools/common"
@@ -11,7 +10,6 @@ import (
 	"go/importer"
 	"go/token"
 	gotypes "go/types"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"text/template"
@@ -20,7 +18,8 @@ import (
 const templateMethodTxt = `package {{$.PackageName}}
 
 import (
-	"github.com/m2c/kiplestar/kipledb"
+	"github.com/jinzhu/gorm"
+	"github.com/m2c/kiplestar"
 	{{range $pkg := $.PackageList}}
 	"{{html $pkg}}"
 	{{end}}
@@ -277,6 +276,7 @@ func (tm *CmdKipleDao) parseDecsToIndex(decs dst.Decorations, fieldMap *map[stri
 	return nil
 }
 
+// public
 func (tgm *CmdKipleDao) ParseIndexToMethod() error {
 	var err error
 	td := CmdKipleDaoFunc{
@@ -408,30 +408,6 @@ func (tm *CmdKipleDao) ParseDstTree(file *dst.File) error {
 				return err
 			}
 		}
-	}
-	return nil
-}
-
-func (tm *CmdKipleDao) Parse(path string) error {
-	var err error
-	path, err = filepath.Abs(path)
-	if err != nil {
-		panic(errors.New("can not parse source to abs filepath"))
-	}
-
-	projectStartPath := filepath.Dir(filepath.Dir(filepath.Dir(path)))
-	projectEndPath := filepath.Base(path)
-	tm.PackageList["entity"] = strings.TrimSuffix(strings.TrimPrefix(path, projectStartPath+"/"), "/"+projectEndPath)
-
-	dstTree, err := tm.GetDstTree(path)
-	if err != nil {
-		return err
-	}
-	if err = tm.ParseDstTree(dstTree); err != nil {
-		return err
-	}
-	if err = tm.ParseIndexToMethod(); err != nil {
-		return err
 	}
 	return nil
 }

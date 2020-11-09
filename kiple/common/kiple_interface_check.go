@@ -18,27 +18,38 @@ type CmdKipleInterfaceCheck struct {
 	InterfaceName string
 	IsDebug       bool
 
+	Environments common.CmdFilePath
 	gen.GenTemplate
 	gen.TemplateModel
 }
 
-func (tpData *CmdKipleInterfaceCheck) CmdHandle() {
+func (tpData *CmdKipleInterfaceCheck) String() string {
+	return tpData.InterfaceName
+}
+func (tpData *CmdKipleInterfaceCheck) Init() error {
 	tpData.InitTemplateFuncs()
 
-	environValues, err := common.GetGenEnvironmentValues(tpData.IsDebug)
+	var err error
+	tpData.Environments, err = common.GetGenEnvironmentValues()
 	if err != nil {
-		panic(err)
+		return err
+	}
+	if tpData.Environments.CmdFileName == "" {
+		tpData.Environments.CmdFileName = fmt.Sprintf("%s.go", common.ToLowerSnakeCase(tpData.InterfaceName))
 	}
 
 	// for test
 	if tpData.IsDebug {
 		os.Setenv("GOFILE", "user_dao_impl.go")
 		os.Setenv("GOPACKAGE", "model")
-		environValues.CmdDir = filepath.Join(common.GetGoPath(), "/src/github.com/illidan33/tools/example/model")
-		environValues.CmdFileName = "user_profiles_dao.go"
+		tpData.Environments.CmdDir = filepath.Join(common.GetGoPath(), "/src/github.com/illidan33/tools/example/model")
+		tpData.Environments.CmdFileName = "user_profiles_dao.go"
 	}
+	return nil
+}
 
-	excuteFilePath := filepath.Join(environValues.CmdDir, environValues.CmdFileName)
+func (tpData *CmdKipleInterfaceCheck) Parse() error {
+	excuteFilePath := filepath.Join(tpData.Environments.CmdDir, tpData.Environments.CmdFileName)
 	if !common.IsExists(excuteFilePath) {
 		panic(errors.New("file not exist: " + excuteFilePath))
 	}
@@ -51,24 +62,22 @@ func (tpData *CmdKipleInterfaceCheck) CmdHandle() {
 		panic(err)
 	}
 
-	fmt.Println(tpData.InterfaceName + " Success")
+	return nil
 }
 
 func (tm *CmdKipleInterfaceCheck) FindInterfaceAndFillMethods(fset *token.FileSet, dstfile *ast.File, dstFilePath string) error {
 	var interfaceNode *ast.InterfaceType
-	userdaoFuncMap := map[string]*ast.Field{}
+	//userdaoFuncMap := map[string]*ast.Field{}
 	for _, decl := range dstfile.Decls {
 		if declv, ok := decl.(*ast.GenDecl); ok && declv.Tok == token.TYPE {
 			if len(declv.Specs) == 0 {
 				return errors.New("FindInterfaceAndFillMethods - GenDecl has no Specs")
 			}
 			if typespec, ok := declv.Specs[0].(*ast.TypeSpec); ok && typespec.Name.Name == tm.InterfaceName {
-				var ok bool
-				interfaceNode, ok = typespec.Type.(*ast.InterfaceType)
-				if ok {
-					for _, field := range interfaceNode.Methods.List {
-						userdaoFuncMap[field.Names[0].Name] = field
-					}
+				if interfaceNode, ok = typespec.Type.(*ast.InterfaceType); ok {
+					//for _, field := range interfaceNode.Methods.List {
+					//	userdaoFuncMap[field.Names[0].Name] = field
+					//}
 					break
 				}
 			}
@@ -89,13 +98,7 @@ func (tm *CmdKipleInterfaceCheck) FindInterfaceAndFillMethods(fset *token.FileSe
 				ffnew := ast.Field{}
 				ffnew.Names = []*ast.Ident{ast.NewIdent(ffv.Name.Name)}
 				ffnew.Type = ffv.Type
-				if _, ok := userdaoFuncMap[ffv.Name.Name]; !ok {
-					interfaceNode.Methods.List = append(interfaceNode.Methods.List, &ffnew)
-					userdaoFuncMap[ffnew.Names[0].Name] = &ffnew
-					newList = append(newList, &ffnew)
-				} else {
-					newList = append(newList, userdaoFuncMap[ffv.Name.Name])
-				}
+				newList = append(newList, &ffnew)
 			}
 		}
 	}

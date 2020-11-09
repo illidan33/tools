@@ -1,9 +1,9 @@
 package cmd
 
 import (
-	"github.com/spf13/cobra"
-	"github.com/illidan33/tools/gen"
+	"github.com/illidan33/tools/common"
 	"github.com/illidan33/tools/gen/method"
+	"github.com/spf13/cobra"
 )
 
 var genMethod method.CmdGenMethod
@@ -11,7 +11,7 @@ var cmdGenMethod = &cobra.Command{
 	Use:   "method",
 	Short: "generate gorm functions of gorm model",
 	Run: func(cmd *cobra.Command, args []string) {
-		gen.Generate(&genMethod)
+		common.Generate(&genMethod)
 	},
 }
 

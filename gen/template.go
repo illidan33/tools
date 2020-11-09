@@ -103,12 +103,8 @@ func (gt *GenTemplate) FormatCodeToFile(filePath string, templateData *bytes.Buf
 
 	f, e := decorator.Parse(templateData.String())
 	if e != nil {
-		// log template text
-		//tmpFile, _ := os.OpenFile(filePath+".error.tmp", os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
-		//defer tmpFile.Close()
-		//tmpFile.Write(templateData.Bytes())
 		fmt.Println(templateData.String())
-		err = e
+		err = fmt.Errorf("format code error: %s", e.Error())
 		return
 	}
 
@@ -156,4 +152,11 @@ func (gt *GenTemplate) GetDstTree(filePath string) (*dst.File, error) {
 		return nil, errors.New("decorator parse error: " + err.Error())
 	}
 	return f, nil
+}
+
+func (tpkg *TemplatePackage) AddPackage(name, val string) {
+	if tpkg.PackageList == nil {
+		tpkg.PackageList = map[string]string{}
+	}
+	tpkg.PackageList[name] = val
 }

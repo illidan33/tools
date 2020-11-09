@@ -1,9 +1,9 @@
 package cmd
 
 import (
-	"github.com/spf13/cobra"
-	"github.com/illidan33/tools/gen"
+	"github.com/illidan33/tools/common"
 	"github.com/illidan33/tools/gen/model"
+	"github.com/spf13/cobra"
 )
 
 var genModel model.CmdGenModel
@@ -11,7 +11,7 @@ var cmdGenModel = &cobra.Command{
 	Use:   "model",
 	Short: "generate ddl sql to struct",
 	Run: func(cmd *cobra.Command, args []string) {
-		gen.Generate(&genModel)
+		common.Generate(&genModel)
 	},
 }
 

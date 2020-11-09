@@ -11,15 +11,7 @@ import (
 	"strings"
 )
 
-func GetGenEnvironmentValues(isDebug bool) (path CmdFilePath, err error) {
-	if isDebug {
-		// for test
-		os.Setenv("GOFILE", "main.go")
-		os.Setenv("GOPACKAGE", "main")
-		os.Setenv("GOARCH", "amd64")
-		os.Setenv("GOOS", "macos")
-		os.Setenv("GOLINE", "5")
-	}
+func GetGenEnvironmentValues(isdebug ...bool) (path CmdFilePath, err error) {
 	path = CmdFilePath{
 		CmdFileName: os.Getenv("GOFILE"),
 		PackageName: os.Getenv("GOPACKAGE"),
@@ -29,7 +21,15 @@ func GetGenEnvironmentValues(isDebug bool) (path CmdFilePath, err error) {
 		CmdDir:      "",
 	}
 	path.CmdDir, err = os.Getwd()
-	fmt.Printf("%#v\n", path)
+	if err != nil {
+		return
+	}
+	if path.PackageName == "" {
+		path.PackageName, err = GetImportPackageName(path.CmdDir)
+		if err != nil {
+			return
+		}
+	}
 	return
 }
 
@@ -41,12 +41,20 @@ func GetCurrentDirectory() (string, error) {
 	return dir, nil
 }
 
-func GetImportPathName(path string) string {
+func GetImportPath(path string) (string, error) {
 	pkg, err := build.ImportDir(path, build.FindOnly)
 	if err != nil {
-		panic(err)
+		return "", err
 	}
-	return pkg.ImportPath
+	return pkg.ImportPath, nil
+}
+
+func GetImportPackageName(path string) (string, error) {
+	pkg, err := build.ImportDir(path, build.ImportComment)
+	if err != nil {
+		return "", err
+	}
+	return pkg.Name, nil
 }
 
 func GetGoPath() string {

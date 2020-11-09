@@ -6,6 +6,7 @@ require (
 	github.com/dave/dst v0.26.0
 	github.com/dave/kerr v0.0.0-20170318121727-bc25dd6abe8e
 	github.com/dave/ktest v1.1.3 // indirect
+	github.com/jinzhu/gorm v1.9.14
 	github.com/m2c/kiplestar v0.0.0-20201010070815-8d61d7400561
 	github.com/spf13/cobra v1.0.0
 	github.com/valyala/fasthttp v1.16.0

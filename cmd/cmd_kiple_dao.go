@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/illidan33/tools/gen"
+	"github.com/illidan33/tools/common"
 	"github.com/illidan33/tools/kiple/dao"
 	"github.com/spf13/cobra"
 )
@@ -11,7 +11,7 @@ var cmdkipleDao = &cobra.Command{
 	Use:   "dao",
 	Short: "generate methods of entity dao",
 	Run: func(cmd *cobra.Command, args []string) {
-		gen.Generate(&kipleDao)
+		common.CmdDo(&kipleDao)
 	},
 }
 

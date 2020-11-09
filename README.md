@@ -34,6 +34,25 @@ Flags:
       --json          generate struct with json tag or not (default true) (default true)
 ```
 
+- gen method
+```
+//go:generate tools gen method --name xxx
+
+tools gen method -h
+
+doc:
+generate gorm functions of gorm model
+
+Usage:
+  tools gen method [flags]
+
+Flags:
+      --debug         open debug flag,default: false
+  -h, --help          help for method
+      --name string   (required) name of source model
+
+```
+
 - gen client
 ```
 //go:generate tools gen client --url "http://xxx.json" -n "xxx"

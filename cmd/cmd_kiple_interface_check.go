@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/illidan33/tools/gen"
+	"github.com/illidan33/tools/common"
 	dao2 "github.com/illidan33/tools/kiple/common"
 	"github.com/spf13/cobra"
 )
@@ -11,7 +11,7 @@ var cmdkipleInterfaceCheck = &cobra.Command{
 	Use:   "interface",
 	Short: "generate methods of interface",
 	Run: func(cmd *cobra.Command, args []string) {
-		gen.Generate(&kipleInterfaceCheck)
+		common.CmdDo(&kipleInterfaceCheck)
 	},
 }
 

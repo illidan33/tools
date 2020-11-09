@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/illidan33/tools/gen"
+	"github.com/illidan33/tools/common"
 	"github.com/illidan33/tools/gen/client"
 
 	"github.com/spf13/cobra"
@@ -12,7 +12,7 @@ var cmdGenClient = &cobra.Command{
 	Use:   "client",
 	Short: "Generate swagger doc to client",
 	Run: func(cmd *cobra.Command, args []string) {
-		gen.Generate(&genClient)
+		common.Generate(&genClient)
 	},
 }
 
