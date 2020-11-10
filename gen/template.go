@@ -110,19 +110,25 @@ func (gt *GenTemplate) FormatCodeToFile(filePath string, templateData *bytes.Buf
 	}
 	filePath, _ = filepath.Abs(filePath)
 
-	f, e := decorator.Parse(templateData.String())
-	if e != nil {
-		fmt.Println(templateData.String())
-		err = fmt.Errorf("FormatCodeToFile - parse error: %s", e.Error())
-		return
-	}
-
 	var file *os.File
 	file, err = os.OpenFile(filePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
 	if err != nil {
 		return errors.New("FormatCodeToFile - open file error: " + err.Error())
 	}
 	defer file.Close()
+
+	// write temporary data to file first
+	file.Write(templateData.Bytes())
+
+	f, e := decorator.Parse(templateData.String())
+	if e != nil {
+		err = fmt.Errorf("FormatCodeToFile - parse error: %s", e.Error())
+		return
+	}
+	// clear file content
+	file.Truncate(0)
+	file.Seek(0, 0)
+
 	err = decorator.Fprint(file, f)
 	if err != nil {
 		return errors.New("FormatCodeToFile - write file error: " + err.Error())

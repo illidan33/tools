@@ -2,8 +2,5 @@
 example
 ./*.exe
 ./tools
-./gen_method
-./gen_model
-./gen_client
-./kiple_interface
-./kiple_dao
+gen_*
+kiple_*

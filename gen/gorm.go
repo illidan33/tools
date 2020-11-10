@@ -98,6 +98,19 @@ var FieldType = map[string]string{
 	"YEAR":       "time.Time",
 }
 
+var NumberMap = map[byte]bool{
+	'0': true,
+	'1': true,
+	'2': true,
+	'3': true,
+	'4': true,
+	'5': true,
+	'6': true,
+	'7': true,
+	'8': true,
+	'9': true,
+}
+
 func (gt *GormTable) isCreateTitle(s string) bool {
 	if strings.Contains(strings.ToUpper(s), types.SQLCONTENTTYPE__CREATE_TABLE) {
 		return true
@@ -186,7 +199,7 @@ func (gt *GormTable) parseIndexFieldString(gi *GormIndex, s string) error {
 		fieldsMap[field.Name] = field
 	}
 	for i, f := range arr {
-		f = gt.TrimField(f)
+		f = gt.getDataBetweenString(f, "`", "`")
 		if v, ok := fieldsMap[f]; ok {
 			v.IsKeyField = true
 			v.KeyName = gi.Name
@@ -571,8 +584,16 @@ func (gt *GormTable) transformGormToModel(tm *TemplateModel, gormFlags GormFlags
 
 	// fields
 	for _, field := range gt.Fields {
+		// check name's first word is number or not
+		flag := 0
+		for i := 0; i < len(field.Name); i++ {
+			if _, ok := NumberMap[field.Name[i]]; !ok {
+				flag = i
+				break
+			}
+		}
 		tgsf := TemplateModelField{
-			Name:    common.ToUpperCamelCase(field.Name),
+			Name:    common.ToUpperCamelCase(field.Name[flag:]),
 			Type:    "",
 			Tag:     "",
 			Comment: field.Comment,
