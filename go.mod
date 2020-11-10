@@ -12,5 +12,3 @@ require (
 	github.com/valyala/fasthttp v1.16.0
 	gopkg.in/yaml.v2 v2.3.0 // indirect
 )
-
-replace github.com/illidan33/tools => ../tools

@@ -367,6 +367,7 @@ func (tgc *TemplateGenClient) parseFuncs(funcs []GenClientFunc) error {
 }
 
 func (tgc *TemplateGenClient) RegisteFuncMap() {
+	tgc.InitTemplateFuncs()
 	tgc.RegisteTemplateFunc(map[string]interface{}{
 		"isModel": func(m gen.TemplateModel) bool {
 			if m.ModelName == "" {

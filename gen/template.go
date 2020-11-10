@@ -51,6 +51,9 @@ func init() {
 }
 
 func (gt *GenTemplate) RegisteTemplateFunc(data map[string]interface{}) {
+	if gt.TemplateMapFuncs == nil {
+		gt.TemplateMapFuncs = map[string]interface{}{}
+	}
 	for name, fc := range data {
 		gt.TemplateMapFuncs[name] = fc
 	}
