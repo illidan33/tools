@@ -4,10 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/illidan33/tools/common"
-	"github.com/illidan33/tools/gen"
-	"os"
 	"path/filepath"
-	"strings"
 )
 
 type CmdGenClient struct {
@@ -16,7 +13,7 @@ type CmdGenClient struct {
 	IsDebug     bool
 
 	Environments common.CmdFilePath
-	TemplateGenClient
+	Template     TemplateGenClient
 }
 
 func (cmdtp *CmdGenClient) String() string {
@@ -36,72 +33,53 @@ func (cmdtp *CmdGenClient) Init() error {
 	if err != nil {
 		return err
 	}
-	cmdtp.PackageName = "client_" + common.ToLowerSnakeCase(cmdtp.ServiceName)
-	cmdtp.ClientModel.ModelName = common.ToUpperCamelCase(cmdtp.PackageName)
+	cmdtp.Template.PackageName = "client_" + common.ToLowerSnakeCase(cmdtp.ServiceName)
+	cmdtp.Template.ClientModel.ModelName = common.ToUpperCamelCase(cmdtp.Template.PackageName)
 
 	if cmdtp.IsDebug {
 		fmt.Printf("%#v\n", cmdtp.Environments)
 	}
+
+	// init func map
+	cmdtp.Template.RegisteFuncMap()
+
 	return nil
 }
 
 func (cmdtp *CmdGenClient) Parse() error {
-	err := cmdtp.ParseSwagger(cmdtp.DocUrl)
+	err := cmdtp.Template.ParseSwagger(cmdtp.DocUrl)
 	if err != nil {
 		return err
 	}
 
-	folderPath := filepath.Join(cmdtp.Environments.CmdDir, cmdtp.PackageName)
-	if !common.IsExists(folderPath) {
-		err := os.MkdirAll(folderPath, os.ModePerm)
-		if err != nil {
-			return err
-		}
-	}
-
-	cmdtp.InitTemplateFuncs()
-	cmdtp.RegisteTemplateFunc(map[string]interface{}{
-		"isModel": func(m gen.TemplateModel) bool {
-			if m.ModelName == "" {
-				return false
-			}
-			return true
-		},
-		"isStruct": func(m gen.TemplateModel) bool {
-			if m.Type == "struct" || strings.Contains(m.Type, "[]") {
-				return true
-			}
-			return false
-		},
-	})
-
-	bf, err := cmdtp.ParseTemplate(templateModelTxt, "templateModelTxt", cmdtp)
+	bfModel, err := cmdtp.Template.ParseTemplate(templateModelTxt, "templateModelTxt", cmdtp.Template)
 	if err != nil {
 		return err
 	}
 	if cmdtp.IsDebug {
-		fmt.Println(bf.String())
+		fmt.Println(bfModel.String())
 	}
 
-	err = cmdtp.FormatCodeToFile(filepath.Join(folderPath, "types_generate.go"), bf)
-	if err != nil {
-		return err
-	}
-
-	bf, err = cmdtp.ParseTemplate(templateClientTxt, "templateClientTxt", cmdtp)
+	bfClient, err := cmdtp.Template.ParseTemplate(templateClientTxt, "templateClientTxt", cmdtp.Template)
 	if err != nil {
 		return err
 	}
 	if cmdtp.IsDebug {
-		fmt.Println(bf.String())
+		fmt.Println(bfClient.String())
 	}
 
-	err = cmdtp.FormatCodeToFile(filepath.Join(folderPath, "client_generate.go"), bf)
+	folderPath := filepath.Join(cmdtp.Environments.CmdDir, cmdtp.Template.PackageName)
+	err = cmdtp.Template.FormatCodeToFile(filepath.Join(folderPath, "types_generate.go"), bfModel)
 	if err != nil {
 		return err
 	}
 
-	err = cmdtp.ParseTemplateAndFormatToFile(cmdtp.Environments.CmdDir)
+	err = cmdtp.Template.FormatCodeToFile(filepath.Join(folderPath, "client_generate.go"), bfClient)
+	if err != nil {
+		return err
+	}
+
+	err = cmdtp.Template.ParseTemplateAndFormatToFile(cmdtp.Environments.CmdDir)
 	if err != nil {
 		return err
 	}

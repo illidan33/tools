@@ -8,8 +8,10 @@ import (
 	"github.com/dave/dst/decorator"
 	"github.com/illidan33/tools/common"
 	"go/ast"
+	"go/importer"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"html/template"
 	"io/ioutil"
 	"os"
@@ -87,29 +89,44 @@ func (gt *GenTemplate) ParseTemplate(templateTxt string, templateName string, te
 	tp.Funcs(gt.TemplateMapFuncs)
 	tp, e = tp.Parse(templateTxt)
 	if e != nil {
+		e = fmt.Errorf("ParseTemplate - parse error: %s\n", e.Error())
 		return
 	}
 	e = tp.Execute(templateSource, templateData)
+	if e != nil {
+		e = fmt.Errorf("ParseTemplate - execute template data error: %s\n", e.Error())
+		return
+	}
 	return
 }
 
 func (gt *GenTemplate) FormatCodeToFile(filePath string, templateData *bytes.Buffer) (err error) {
+	dir := filepath.Dir(filePath)
+	if !common.IsExists(dir) {
+		err := os.MkdirAll(dir, os.ModePerm)
+		if err != nil {
+			return err
+		}
+	}
 	filePath, _ = filepath.Abs(filePath)
 
 	f, e := decorator.Parse(templateData.String())
 	if e != nil {
 		fmt.Println(templateData.String())
-		err = fmt.Errorf("format code error: %s", e.Error())
+		err = fmt.Errorf("FormatCodeToFile - parse error: %s", e.Error())
 		return
 	}
 
 	var file *os.File
 	file, err = os.OpenFile(filePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
 	if err != nil {
-		return err
+		return errors.New("FormatCodeToFile - open file error: " + err.Error())
 	}
 	defer file.Close()
 	err = decorator.Fprint(file, f)
+	if err != nil {
+		return errors.New("FormatCodeToFile - write file error: " + err.Error())
+	}
 	return
 }
 
@@ -117,7 +134,7 @@ func (gt *GenTemplate) GetAstTree(filePath string) (*token.FileSet, *ast.File, e
 	fset := token.NewFileSet()
 	astfile, err := parser.ParseFile(fset, filePath, nil, parser.ParseComments)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.New("GetAstTree - ParseFile error: " + err.Error())
 	}
 	return fset, astfile, nil
 }
@@ -126,7 +143,7 @@ func (gt *GenTemplate) GetDstTree(filePath string) (*dst.File, error) {
 	var file *os.File
 	var err error
 	if !common.IsExists(filePath) {
-		return nil, errors.New("file not exist")
+		return nil, errors.New("GetDstTree - file not exist")
 	}
 	file, err = os.Open(filePath)
 	if err != nil {
@@ -139,14 +156,23 @@ func (gt *GenTemplate) GetDstTree(filePath string) (*dst.File, error) {
 		return nil, err
 	}
 	if len(codes) == 0 {
-		return nil, errors.New("file empty")
+		return nil, errors.New("GetDstTree - file empty")
 	}
 
 	f, err := decorator.Parse(codes)
 	if err != nil {
-		return nil, errors.New("decorator parse error: " + err.Error())
+		return nil, errors.New("GetDstTree - decorator parse error: " + err.Error())
 	}
 	return f, nil
+}
+
+func (gt *GenTemplate) GetTypesPackage(filePath string) (*types.Package, error) {
+	pkg, err := importer.For("source", nil).Import(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	return pkg, nil
 }
 
 type TemplatePackage struct {

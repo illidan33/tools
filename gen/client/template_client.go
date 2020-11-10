@@ -366,6 +366,23 @@ func (tgc *TemplateGenClient) parseFuncs(funcs []GenClientFunc) error {
 	return nil
 }
 
+func (tgc *TemplateGenClient) RegisteFuncMap() {
+	tgc.RegisteTemplateFunc(map[string]interface{}{
+		"isModel": func(m gen.TemplateModel) bool {
+			if m.ModelName == "" {
+				return false
+			}
+			return true
+		},
+		"isStruct": func(m gen.TemplateModel) bool {
+			if m.Type == "struct" || strings.Contains(m.Type, "[]") {
+				return true
+			}
+			return false
+		},
+	})
+}
+
 func (tgc *TemplateGenClient) ParseSwagger(url string) error {
 	var body []byte
 	var err error

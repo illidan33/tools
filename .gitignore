@@ -1,8 +1,9 @@
 .idea
+example
 ./*.exe
 ./tools
 ./gen_method
 ./gen_model
 ./gen_client
-./kiple_dao
 ./kiple_interface
+./kiple_dao

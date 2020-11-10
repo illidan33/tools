@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"github.com/dave/dst"
 	"github.com/illidan33/tools/common"
-	"github.com/illidan33/tools/gen"
-	"os"
 	"path/filepath"
 )
 
@@ -16,47 +14,37 @@ type CmdKipleDao struct {
 	Entity        string
 	IsDebug       bool
 
-	Environments      common.CmdFilePath
-	EntityName        string
-	EntityPackageName string
-	gen.GenTemplate
-	gen.TemplatePackage
-	gen.TemplateModel
-	CmdKipleDaoFuncNames []string
-	CmdKipleDaoFuncs     []string
-	CmdKipleDaoIndexs    []CmdKipleDaoIndex
+	Environments common.CmdFilePath
+	Template     KipleTemplateDao
 }
 
 const implNameFlag = "Impl"
 
-func (tpData *CmdKipleDao) String() string {
-	return tpData.InterfaceName
+func (cmdtp *CmdKipleDao) String() string {
+	return cmdtp.InterfaceName
 }
-func (tpData *CmdKipleDao) Init() (err error) {
-	tpData.InitTemplateFuncs()
-
-	tpData.Environments, err = common.GetGenEnvironmentValues()
+func (cmdtp *CmdKipleDao) Init() (err error) {
+	cmdtp.Environments, err = common.GetGenEnvironmentValues()
 	if err != nil {
 		return
 	}
-	fmt.Printf("environment: %#v\n", tpData.Environments)
 
-	tpData.PackageName = tpData.Environments.PackageName
-	tpData.ModelName = tpData.InterfaceName + implNameFlag
-
-	// for test
-	if tpData.IsDebug {
-		os.Setenv("GOFILE", "user_dao_impl.go")
-		os.Setenv("GOPACKAGE", "model")
-		tpData.Environments.CmdDir = filepath.Join(common.GetGoPath(), "/src/github.com/illidan33/tools/example/entity")
+	if cmdtp.IsDebug {
+		fmt.Printf("environment: %#v\n", cmdtp.Environments)
+		if cmdtp.Environments.PackageName == "main" {
+			cmdtp.Environments.PackageName = "entity"
+			cmdtp.Environments.CmdDir = filepath.Join(common.GetGoPath(), "/src/github.com/illidan33/tools/example/entity")
+		}
 	}
-
+	cmdtp.Template.PackageName = cmdtp.Environments.PackageName
+	cmdtp.Template.ModelName = cmdtp.InterfaceName + implNameFlag
+	cmdtp.Template.InterfaceName = cmdtp.InterfaceName
 	return
 }
 
-func (tpData *CmdKipleDao) Parse() (err error) {
+func (cmdtp *CmdKipleDao) Parse() (err error) {
 	var path string
-	path, err = filepath.Abs(tpData.Entity)
+	path, err = filepath.Abs(cmdtp.Entity)
 	if err != nil {
 		err = errors.New("can not parse source to abs filepath")
 		return
@@ -68,31 +56,34 @@ func (tpData *CmdKipleDao) Parse() (err error) {
 	if err != nil {
 		return
 	}
-	if tpData.PackageName != pathPackage {
+	if cmdtp.Template.PackageName != pathPackage {
 		pkgPath, err := common.GetImportPath(pathDir)
 		if err != nil {
 			return err
 		}
-		tpData.AddPackage("entity", pkgPath)
+		cmdtp.Template.AddPackage("entity", pkgPath)
 	}
 
 	var dstTree *dst.File
-	dstTree, err = tpData.GetDstTree(path)
+	dstTree, err = cmdtp.Template.GetDstTree(path)
 	if err != nil {
-		return err
-	}
-	if err = tpData.ParseDstTree(dstTree); err != nil {
 		return
 	}
-	if err = tpData.ParseIndexToMethod(); err != nil {
+	if err = cmdtp.Template.ParseKipleDstTree(dstTree); err != nil {
+		return
+	}
+	if err = cmdtp.Template.ParseKipleIndexToMethod(); err != nil {
 		return
 	}
 
 	var bf *bytes.Buffer
-	bf, err = tpData.ParseTemplate(templateMethodTxt, tpData.ModelName, tpData)
+	bf, err = cmdtp.Template.ParseTemplate(templateMethodTxt, cmdtp.Template.ModelName, cmdtp.Template)
+	if err != nil {
+		return
+	}
 
-	dstFilePath := filepath.Join(tpData.Environments.CmdDir, common.ToLowerSnakeCase(tpData.InterfaceName)+".go")
-	err = tpData.FormatCodeToFile(dstFilePath, bf)
+	dstFilePath := filepath.Join(cmdtp.Environments.CmdDir, common.ToLowerSnakeCase(cmdtp.InterfaceName)+".go")
+	err = cmdtp.Template.FormatCodeToFile(dstFilePath, bf)
 	if err != nil {
 		return
 	}

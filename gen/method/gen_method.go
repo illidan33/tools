@@ -3,28 +3,21 @@ package method
 import (
 	"fmt"
 	"github.com/illidan33/tools/common"
-	"github.com/illidan33/tools/gen"
 	"path/filepath"
 )
 
 type CmdGenMethod struct {
-	IsDebug bool
-	// ModelName string // init in cmd flags
+	IsDebug   bool
+	ModelName string
 
-	gen.GenTemplate
-	gen.TemplatePackage
-	gen.TemplateModel
-	Environments             common.CmdFilePath
-	TemplateDataMethodFuncs  []string
-	TemplateDataMethodIndexs []TemplateDataMethodIndex
+	Environments common.CmdFilePath
+	Template     TemplateDataMethod
 }
 
 func (cmdtp *CmdGenMethod) String() string {
 	return cmdtp.ModelName
 }
 func (cmdtp *CmdGenMethod) Init() error {
-	cmdtp.InitTemplateFuncs()
-
 	var err error
 	cmdtp.Environments, err = common.GetGenEnvironmentValues()
 	if err != nil {
@@ -42,7 +35,8 @@ func (cmdtp *CmdGenMethod) Init() error {
 			cmdtp.Environments.CmdDir = filepath.Join(common.GetGoPath(), "/src/github.com/illidan33/tools/example/model")
 		}
 	}
-	cmdtp.PackageName = cmdtp.Environments.PackageName
+	cmdtp.Template.PackageName = cmdtp.Environments.PackageName
+	cmdtp.Template.ModelName = cmdtp.ModelName
 
 	return nil
 }
@@ -51,23 +45,23 @@ func (cmdtp *CmdGenMethod) Parse() error {
 	if err != nil {
 		return err
 	}
-	if err := cmdtp.ImportFile(tmpPath); err != nil {
+	if err := cmdtp.Template.ParseImportFile(tmpPath); err != nil {
 		fmt.Println(err) // 记录错误，不打断，退化到由语法树来解析字段
 	}
 
 	filePath := filepath.Join(cmdtp.Environments.CmdDir, cmdtp.Environments.CmdFileName)
-	dstTree, err := cmdtp.GetDstTree(filePath)
+	dstTree, err := cmdtp.Template.GetDstTree(filePath)
 	if err != nil {
 		return err
 	}
-	if err = cmdtp.ParseDstTree(dstTree); err != nil {
+	if err = cmdtp.Template.ParseDstTree(dstTree); err != nil {
 		return err
 	}
-	if err = cmdtp.ParseIndexToMethod(); err != nil {
+	if err = cmdtp.Template.ParseIndexToMethod(); err != nil {
 		return err
 	}
 
-	bf, err := cmdtp.ParseTemplate(templateMethodTxt, cmdtp.ModelName, cmdtp)
+	bf, err := cmdtp.Template.ParseTemplate(templateMethodTxt, cmdtp.ModelName, cmdtp.Template)
 	if err != nil {
 		return err
 	}
@@ -76,7 +70,7 @@ func (cmdtp *CmdGenMethod) Parse() error {
 	}
 
 	dstFilePath := filepath.Join(cmdtp.Environments.CmdDir, common.ToLowerSnakeCase(cmdtp.ModelName)+"_generate.go")
-	err = cmdtp.FormatCodeToFile(dstFilePath, bf)
+	err = cmdtp.Template.FormatCodeToFile(dstFilePath, bf)
 	if err != nil {
 		return err
 	}

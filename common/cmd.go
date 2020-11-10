@@ -24,7 +24,7 @@ func CmdDo(cmd CmdHandle) {
 		panic(fmt.Errorf("\033[1;31mInit error: \n%s\033[0m\n", err.Error()))
 	}
 	if err = cmd.Parse(); err != nil {
-		panic(fmt.Errorf("\033[1;31mInit error: \n%s\033[0m\n", err.Error()))
+		panic(fmt.Errorf("\033[1;31mParse error: \n%s\033[0m\n", err.Error()))
 	}
 	fmt.Printf("\033[1;32m%s generate success\033[0m\n", cmd.String())
 }
