@@ -18,20 +18,7 @@ the cmd file 'tools' will be installed to your $GOBIN directory.
 
 tools gen model -h      
 
-doc: 
-generate ddl sql to struct
-
-Usage:
-  tools gen model [flags]
-
-Flags:
-      --debug         open debug flag (default false)
-      --default       generate struct with default tag or not (default false)
-  -f, --file string   (required) generate model from file path, make sure not has single quote in your field comment of ddl string.
-      --gmsimple      generate struct with simple gorm tag or not (default true) (default true)
-      --gorm          generate struct with gorm tag or not (default true) (default true)
-  -h, --help          help for model
-      --json          generate struct with json tag or not (default true) (default true)
+根据ddl文件批量生成对应的golang struc
 ```
 
 - gen method
@@ -40,17 +27,7 @@ Flags:
 
 tools gen method -h
 
-doc:
-generate gorm functions of gorm model
-
-Usage:
-  tools gen method [flags]
-
-Flags:
-      --debug         open debug flag,default: false
-  -h, --help          help for method
-      --name string   (required) name of source model
-
+根据model生成常用的数据库通用func
 ```
 
 - gen client
@@ -59,53 +36,21 @@ Flags:
 
 tools gen client -h   
 
-doc:                                                              
-Generate swagger doc to client
-
-Usage:
-  tools gen client [flags]
-
-Flags:
-  -n, --client-name string   (required) Generate client name
-      --debug                open debug flag,default: false
-  -h, --help                 help for client
-      --url string           (required) Generate client from swagger url
+根据swagger文件反解析生成对应的api
 ```
 
-- kiple dao
+- kiple daocreate
 ```
-//go:generate tools kiple dao -i UserProfilesDao -e "../entity/xxx.go"
+//go:generate tools kiple daocreate -i UserProfilesDao -e "../entity/xxx.go"
 
-tools kiple dao -h
+tools kiple daocreate -h
 
-doc:
-generate methods of entity dao
-
-Usage:
-  tools kiple dao [flags]
-
-Flags:
-  -d, --debug                  open debug flag,default: false
-  -e, --entity string          (required) the entity place where generating code from
-  -h, --help                   help for dao
-  -i, --interfaceName string   (required) the interface name which you want to create
+根据entity批量生成kiple对应的常用的数据库操作func
 ```
 
-- kiple interface
+- kiple daosync
 ```
-//go:generate tools kiple method -i xxx -m xxx
+//go:generate tools kiple daosync -i xxx -m xxx
 
-tools kiple interface -h
-
-doc:
-generate methods of interface
-
-Usage:
-  tools kiple interface [flags]
-
-Flags:
-  -d, --debug                  open debug flag,default: false
-  -h, --help                   help for interface
-  -i, --interfaceName string   (required) the interface name which you want to create
-  -m, --moduleName string      (required) the module name which you want to generate from
+同步model的所有funcs到interface中
 ```

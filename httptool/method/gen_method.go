@@ -31,7 +31,7 @@ func (cgm *CmdGenMethod) CmdHandle() {
 	if cgm.IsDebug {
 		os.Setenv("GOFILE", "mp_orders.go")
 		os.Setenv("GOPACKAGE", "model")
-		exeFilePath = os.Getenv("GOPATH") + "/src/github.com/illidan33/tools/example/model"
+		exeFilePath = os.Getenv("GOPATH") + "/src/github.com/illidan33/gotest/tools_test/example/model"
 		cmdFile.CmdFileName = "mp_orders.go"
 		tpData.PackageName = "model"
 	}

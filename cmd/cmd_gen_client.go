@@ -17,7 +17,7 @@ var cmdGenClient = &cobra.Command{
 }
 
 func init() {
-	cmdGenClient.Flags().StringVarP(&genClient.DocUrl, "url", "", "", "(required) Generate client from swagger url")
+	cmdGenClient.Flags().StringVarP(&genClient.DocUrl, "url", "u", "", "(required) Generate client from swagger url")
 	cmdGenClient.Flags().StringVarP(&genClient.ServiceName, "name", "n", "", "(required) Generate client name")
 	cmdGenClient.Flags().BoolVarP(&genClient.IsDebug, "debug", "d", false, "open debug flag,default: false")
 

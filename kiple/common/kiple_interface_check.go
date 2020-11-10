@@ -43,7 +43,7 @@ func (tpData *CmdKipleInterfaceCheck) Init() error {
 	if tpData.IsDebug {
 		os.Setenv("GOFILE", "user_dao_impl.go")
 		os.Setenv("GOPACKAGE", "model")
-		tpData.Environments.CmdDir = filepath.Join(common.GetGoPath(), "/src/github.com/illidan33/tools/example/model")
+		tpData.Environments.CmdDir = filepath.Join(common.GetGoPath(), "/src/github.com/illidan33/gotest/tools_test/example/model")
 		tpData.Environments.CmdFileName = "user_profiles_dao.go"
 	}
 	return nil

@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"reflect"
 )
 
 type CmdGen interface {
@@ -26,5 +27,5 @@ func CmdDo(cmd CmdHandle) {
 	if err = cmd.Parse(); err != nil {
 		panic(fmt.Errorf("\033[1;31mParse error: \n%s\033[0m\n", err.Error()))
 	}
-	fmt.Printf("\033[1;32m%s generate success\033[0m\n", cmd.String())
+	fmt.Printf("\033[1;32m%s %s-generate success\033[0m\n", cmd.String(), reflect.TypeOf(cmd).String())
 }
