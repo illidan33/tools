@@ -9,15 +9,15 @@ import (
 var genMethod method.CmdGenMethod
 var cmdGenMethod = &cobra.Command{
 	Use:   "method",
-	Short: "generate gorm functions of gorm model",
+	Short: "generate db handle functions for one model",
 	Run: func(cmd *cobra.Command, args []string) {
-		common.Generate(&genMethod)
+		common.CmdDo(&genMethod)
 	},
 }
 
 func init() {
-	cmdGenMethod.Flags().StringVarP(&genMethod.ModelName, "name", "", "", "(required) name of source model")
-	cmdGenMethod.Flags().BoolVarP(&genMethod.IsDebug, "debug", "", false, "open debug flag,default: false")
+	cmdGenMethod.Flags().StringVarP(&genMethod.ModelName, "name", "n", "", "(required) name of source model")
+	cmdGenMethod.Flags().BoolVarP(&genMethod.IsDebug, "debug", "d", false, "open debug flag (default: false)")
 
 	cmdGen.AddCommand(cmdGenMethod)
 }

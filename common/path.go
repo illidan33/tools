@@ -8,10 +8,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
-func GetGenEnvironmentValues(isdebug ...bool) (path CmdFilePath, err error) {
+func GetGenEnvironmentValues() (path CmdFilePath, err error) {
 	path = CmdFilePath{
 		CmdFileName: os.Getenv("GOFILE"),
 		PackageName: os.Getenv("GOPACKAGE"),
@@ -22,13 +23,20 @@ func GetGenEnvironmentValues(isdebug ...bool) (path CmdFilePath, err error) {
 	}
 	path.CmdDir, err = os.Getwd()
 	if err != nil {
+		err = fmt.Errorf("Getwd error: %s", err.Error())
 		return
 	}
 	if path.PackageName == "" {
-		path.PackageName, err = GetImportPackageName(path.CmdDir)
-		if err != nil {
-			return
+		path.PackageName, _ = GetImportPackageName(path.CmdDir)
+		if path.PackageName == "" {
+			path.PackageName = filepath.Base(path.CmdDir)
 		}
+	}
+	if path.Sys == "" {
+		path.Sys = runtime.GOOS
+	}
+	if path.SysArch == "" {
+		path.SysArch = runtime.GOARCH
 	}
 	return
 }

@@ -16,7 +16,7 @@ func (cgm *CmdGenMethod) CmdHandle() {
 	tpData := TemplateDataMethod{}
 	tpData.InitTemplateFuncs()
 
-	cmdFile, err := common.GetGenEnvironmentValues(cgm.IsDebug)
+	cmdFile, err := common.GetGenEnvironmentValues()
 	if err != nil {
 		panic(err)
 	}

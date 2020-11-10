@@ -4,43 +4,106 @@ import (
 	"errors"
 	"fmt"
 	"github.com/illidan33/tools/common"
+	"github.com/illidan33/tools/gen"
 	"os"
+	"path/filepath"
+	"strings"
 )
 
 type CmdGenClient struct {
 	DocUrl      string
 	ServiceName string
 	IsDebug     bool
+
+	Environments common.CmdFilePath
+	TemplateGenClient
 }
 
-func (cgc CmdGenClient) CmdHandle() {
-	tpData := TemplateGenClient{}
+func (cmdtp *CmdGenClient) String() string {
+	return cmdtp.ServiceName
+}
 
-	if cgc.DocUrl == "" {
-		panic(errors.New("DocUrl required"))
+func (cmdtp *CmdGenClient) Init() error {
+	if cmdtp.DocUrl == "" {
+		return errors.New("DocUrl required")
 	}
-	if cgc.ServiceName == "" {
-		panic(errors.New("ServiceName required"))
+	if cmdtp.ServiceName == "" {
+		return errors.New("ServiceName required")
 	}
 
-	//package:= tpData.GetGenEnvironmentValues()
-	tpData.PackageName = "client_" + common.ToLowerSnakeCase(cgc.ServiceName)
-	tpData.ClientModel.ModelName = common.ToUpperCamelCase(tpData.PackageName)
-
-	err := tpData.Parse(cgc.DocUrl, cgc.IsDebug)
+	var err error
+	cmdtp.Environments, err = common.GetGenEnvironmentValues()
 	if err != nil {
-		panic(err)
+		return err
 	}
+	cmdtp.PackageName = "client_" + common.ToLowerSnakeCase(cmdtp.ServiceName)
+	cmdtp.ClientModel.ModelName = common.ToUpperCamelCase(cmdtp.PackageName)
 
-	exeFilePath, err := os.Getwd()
+	if cmdtp.IsDebug {
+		fmt.Printf("%#v\n", cmdtp.Environments)
+	}
+	return nil
+}
+
+func (cmdtp *CmdGenClient) Parse() error {
+	err := cmdtp.ParseSwagger(cmdtp.DocUrl)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
-	err = tpData.ParseTemplateAndFormatToFile(exeFilePath)
+	folderPath := filepath.Join(cmdtp.Environments.CmdDir, cmdtp.PackageName)
+	if !common.IsExists(folderPath) {
+		err := os.MkdirAll(folderPath, os.ModePerm)
+		if err != nil {
+			return err
+		}
+	}
+
+	cmdtp.InitTemplateFuncs()
+	cmdtp.RegisteTemplateFunc(map[string]interface{}{
+		"isModel": func(m gen.TemplateModel) bool {
+			if m.ModelName == "" {
+				return false
+			}
+			return true
+		},
+		"isStruct": func(m gen.TemplateModel) bool {
+			if m.Type == "struct" || strings.Contains(m.Type, "[]") {
+				return true
+			}
+			return false
+		},
+	})
+
+	bf, err := cmdtp.ParseTemplate(templateModelTxt, "templateModelTxt", cmdtp)
 	if err != nil {
-		panic(err)
+		return err
+	}
+	if cmdtp.IsDebug {
+		fmt.Println(bf.String())
 	}
 
-	fmt.Println(cgc.ServiceName + " Success")
+	err = cmdtp.FormatCodeToFile(filepath.Join(folderPath, "types_generate.go"), bf)
+	if err != nil {
+		return err
+	}
+
+	bf, err = cmdtp.ParseTemplate(templateClientTxt, "templateClientTxt", cmdtp)
+	if err != nil {
+		return err
+	}
+	if cmdtp.IsDebug {
+		fmt.Println(bf.String())
+	}
+
+	err = cmdtp.FormatCodeToFile(filepath.Join(folderPath, "client_generate.go"), bf)
+	if err != nil {
+		return err
+	}
+
+	err = cmdtp.ParseTemplateAndFormatToFile(cmdtp.Environments.CmdDir)
+	if err != nil {
+		return err
+	}
+	return nil
 }

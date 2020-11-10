@@ -20,18 +20,11 @@ type GenTemplate struct {
 	TemplateMapFuncs map[string]interface{}
 }
 
-var DefaultGenTemplate = &GenTemplate{}
-
 type TemplateModel struct {
 	ModelName           string
 	ModelComment        string
 	Type                string // like []Model or empty
 	TemplateModelFields []TemplateModelField
-}
-
-type TemplatePackage struct {
-	PackageName string
-	PackageList map[string]string
 }
 
 type TemplateModelField struct {
@@ -48,6 +41,8 @@ type TemplateGenModelFunc struct {
 	Args           []TemplateModelField
 	Returns        []TemplateModelField
 }
+
+var DefaultGenTemplate = &GenTemplate{}
 
 func init() {
 	DefaultGenTemplate.InitTemplateFuncs()
@@ -152,6 +147,11 @@ func (gt *GenTemplate) GetDstTree(filePath string) (*dst.File, error) {
 		return nil, errors.New("decorator parse error: " + err.Error())
 	}
 	return f, nil
+}
+
+type TemplatePackage struct {
+	PackageName string
+	PackageList map[string]string
 }
 
 func (tpkg *TemplatePackage) AddPackage(name, val string) {

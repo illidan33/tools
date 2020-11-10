@@ -1,13 +1,9 @@
 package model
 
 import (
-	"bytes"
-	"fmt"
 	"github.com/illidan33/tools/common"
 	"github.com/illidan33/tools/gen"
-	"os"
 	"path/filepath"
-	"strings"
 )
 
 type CmdGenModel struct {
@@ -17,67 +13,77 @@ type CmdGenModel struct {
 	WithJsonTag       bool
 	WithDefaultTag    bool
 	IsDebug           bool
+
+	Environments common.CmdFilePath
+	NameString   string
+	//gen.GenTemplate
+	//gen.TemplatePackage
+	//gen.TemplateModel
 }
 
-func (cgm *CmdGenModel) CmdHandle() {
-	packageFile, err := common.GetGenEnvironmentValues(cgm.IsDebug)
+func (tpData *CmdGenModel) String() string {
+	return tpData.NameString
+}
+
+func (tpData *CmdGenModel) Init() error {
+	//tpData.InitTemplateFuncs()
+
+	var err error
+	tpData.Environments, err = common.GetGenEnvironmentValues()
 	if err != nil {
-		panic(err)
+		return err
 	}
 
-	rootPath, err := os.Getwd()
-	if err != nil {
-		panic(err)
+	// for test
+	if tpData.IsDebug {
+		tpData.Environments.PackageName = "model_test"
+		tpData.Environments.CmdDir = filepath.Join(common.GetGoPath(), "/src/github.com/illidan33/tools/example/model")
 	}
+
+	return nil
+}
+func (tpData *CmdGenModel) Parse() error {
+	var err error
 
 	// parse sql
 	gormFlags := gen.GormFlags{
-		HasGorm:      cgm.WithGormTag,
-		IsSimpleGorm: cgm.WithSimpleGormTag,
-		HasJson:      cgm.WithJsonTag,
-		HasDefault:   cgm.WithDefaultTag,
+		HasGorm:      tpData.WithGormTag,
+		IsSimpleGorm: tpData.WithSimpleGormTag,
+		HasJson:      tpData.WithJsonTag,
+		HasDefault:   tpData.WithDefaultTag,
 	}
 	gormTable := gen.GormTableList{}
-	if !filepath.IsAbs(cgm.DdlFilePath) {
-		cgm.DdlFilePath = filepath.Join(rootPath, cgm.DdlFilePath)
+	if !filepath.IsAbs(tpData.DdlFilePath) {
+		tpData.DdlFilePath, err = filepath.Abs(tpData.DdlFilePath)
+		if err != nil {
+			return err
+		}
 	}
-	rs, err := gormTable.Parse(cgm.DdlFilePath, gormFlags)
+	rs, err := gormTable.Parse(tpData.DdlFilePath, gormFlags)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	for _, tpmData := range rs {
-		tpData := TemplateDataModel{
+		tpDataTmp := TemplateDataModel{
 			GenTemplate: gen.GenTemplate{},
 			TemplatePackage: gen.TemplatePackage{
-				PackageName: packageFile.PackageName,
+				PackageName: tpData.Environments.PackageName,
 				PackageList: map[string]string{},
 			},
 			TemplateModel: tpmData,
 		}
-		for _, field := range tpData.TemplateModelFields {
-			if strings.Contains(field.Type, "time") {
-				tpData.PackageList["time"] = "time"
-			}
+
+		codeData, err := tpDataTmp.Parse()
+		if err != nil {
+			return err
 		}
 
-		var codeData *bytes.Buffer
-		if codeData, err = tpData.ParseTemplate(templateModelTxt, tpData.ModelName, tpData, map[string]interface{}{
-			"hasComment": func(field gen.TemplateModelField) bool {
-				if field.Comment != "" {
-					return true
-				}
-				return false
-			},
-		}); err != nil {
-			panic(err)
+		filePath := filepath.Join(tpData.Environments.CmdDir, common.ToLowerSnakeCase(tpDataTmp.ModelName)+".go")
+		if err = tpDataTmp.FormatCodeToFile(filePath, codeData); err != nil {
+			return err
 		}
-
-		filename := common.ToLowerSnakeCase(tpData.ModelName)
-		filePath := filepath.Join(rootPath, filename+".go")
-		if err = tpData.FormatCodeToFile(filePath, codeData); err != nil {
-			panic(err)
-		}
-		fmt.Println(tpData.ModelName + " Success")
+		tpData.NameString += tpDataTmp.ModelName + "\r\n"
 	}
+	return nil
 }

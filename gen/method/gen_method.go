@@ -1,61 +1,84 @@
 package method
 
 import (
-	"errors"
 	"fmt"
 	"github.com/illidan33/tools/common"
-	"os"
+	"github.com/illidan33/tools/gen"
+	"path/filepath"
 )
 
 type CmdGenMethod struct {
-	ModelName string
-	IsDebug   bool
+	IsDebug bool
+	// ModelName string // init in cmd flags
+
+	gen.GenTemplate
+	gen.TemplatePackage
+	gen.TemplateModel
+	Environments             common.CmdFilePath
+	TemplateDataMethodFuncs  []string
+	TemplateDataMethodIndexs []TemplateDataMethodIndex
 }
 
-func (cgm *CmdGenMethod) CmdHandle() {
-	tpData := TemplateDataMethod{}
-	tpData.InitTemplateFuncs()
+func (cmdtp *CmdGenMethod) String() string {
+	return cmdtp.ModelName
+}
+func (cmdtp *CmdGenMethod) Init() error {
+	cmdtp.InitTemplateFuncs()
 
-	cmdFile, err := common.GetGenEnvironmentValues(cgm.IsDebug)
+	var err error
+	cmdtp.Environments, err = common.GetGenEnvironmentValues()
 	if err != nil {
-		panic(err)
+		return err
 	}
-	exeFilePath, err := os.Getwd()
-	if err != nil {
-		panic(err)
+	if cmdtp.Environments.CmdFileName == "" {
+		cmdtp.Environments.CmdFileName = common.ToLowerSnakeCase(cmdtp.ModelName) + ".go"
 	}
-	tpData.PackageName = cmdFile.PackageName
-	tpData.ModelName = cgm.ModelName
 
 	// for test
-	if cgm.IsDebug {
-		os.Setenv("GOFILE", "mp_orders.go")
-		os.Setenv("GOPACKAGE", "model")
-		exeFilePath = os.Getenv("GOPATH") + "/src/github.com/illidan33/tools/example/model"
-		cmdFile.CmdFileName = "mp_orders.go"
-		tpData.PackageName = "model"
+	if cmdtp.IsDebug {
+		fmt.Printf("%#v\n", cmdtp.Environments)
+		if cmdtp.Environments.PackageName == "main" {
+			cmdtp.Environments.PackageName = "model_test"
+			cmdtp.Environments.CmdDir = filepath.Join(common.GetGoPath(), "/src/github.com/illidan33/tools/example/model")
+		}
 	}
+	cmdtp.PackageName = cmdtp.Environments.PackageName
 
-	filePath := fmt.Sprintf("%s/%s", exeFilePath, cmdFile.CmdFileName)
-	err = tpData.Parse(filePath, cgm.IsDebug)
+	return nil
+}
+func (cmdtp *CmdGenMethod) Parse() error {
+	tmpPath, err := common.GetImportPath(cmdtp.Environments.CmdDir)
 	if err != nil {
-		panic(err)
+		return err
+	}
+	if err := cmdtp.ImportFile(tmpPath); err != nil {
+		fmt.Println(err) // 记录错误，不打断，退化到由语法树来解析字段
 	}
 
-	if tpData.ModelName != cgm.ModelName {
-		panic(errors.New("Struct not found: " + cgm.ModelName))
-	}
-
-	bf, err := tpData.ParseTemplate(templateMethodTxt, tpData.ModelName, tpData)
+	filePath := filepath.Join(cmdtp.Environments.CmdDir, cmdtp.Environments.CmdFileName)
+	dstTree, err := cmdtp.GetDstTree(filePath)
 	if err != nil {
-		panic(err)
+		return err
+	}
+	if err = cmdtp.ParseDstTree(dstTree); err != nil {
+		return err
+	}
+	if err = cmdtp.ParseIndexToMethod(); err != nil {
+		return err
 	}
 
-	dstFilePath := fmt.Sprintf("%s/%s_generate.go", exeFilePath, common.ToLowerSnakeCase(tpData.ModelName))
-	err = tpData.FormatCodeToFile(dstFilePath, bf)
+	bf, err := cmdtp.ParseTemplate(templateMethodTxt, cmdtp.ModelName, cmdtp)
 	if err != nil {
-		panic(err)
+		return err
+	}
+	if cmdtp.IsDebug {
+		fmt.Printf(bf.String())
 	}
 
-	fmt.Println(cgm.ModelName + " Success")
+	dstFilePath := filepath.Join(cmdtp.Environments.CmdDir, common.ToLowerSnakeCase(cmdtp.ModelName)+"_generate.go")
+	err = cmdtp.FormatCodeToFile(dstFilePath, bf)
+	if err != nil {
+		return err
+	}
+	return nil
 }

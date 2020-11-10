@@ -26,6 +26,7 @@ type CmdKipleInterfaceCheck struct {
 func (tpData *CmdKipleInterfaceCheck) String() string {
 	return tpData.InterfaceName
 }
+
 func (tpData *CmdKipleInterfaceCheck) Init() error {
 	tpData.InitTemplateFuncs()
 

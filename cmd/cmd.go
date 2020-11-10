@@ -2,14 +2,14 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-
 	"github.com/spf13/cobra"
+	"os"
 )
 
 var cmdRoot = &cobra.Command{
 	Use:   "tools",
 	Short: "tools for generate code",
+	Long:  "",
 }
 
 func Execute() {
