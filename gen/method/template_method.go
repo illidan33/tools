@@ -119,13 +119,13 @@ func (gt *TemplateDataMethod) GenFuncName(fields []gen.TemplateModelField) strin
 	return common.ToUpperCamelCase(str)
 }
 
-func (tgm *TemplateDataMethod) JoinFields(modelName string, fields []gen.TemplateModelField) string {
+func (tgm *TemplateDataMethod) JoinFields(targetName string, fields []gen.TemplateModelField) string {
 	rs := ""
 	for i, arg := range fields {
 		if i == 0 {
-			rs = fmt.Sprintf("%s.%s", modelName, arg.Name)
+			rs = fmt.Sprintf("%s.%s", targetName, arg.Name)
 		} else {
-			rs = fmt.Sprintf("%s, %s.%s", rs, modelName, arg.Name)
+			rs = fmt.Sprintf("%s, %s.%s", rs, targetName, arg.Name)
 		}
 	}
 	return rs
@@ -134,7 +134,7 @@ func (tgm *TemplateDataMethod) JoinFields(modelName string, fields []gen.Templat
 func (tgm *TemplateDataMethod) JoinWhere(fields []gen.TemplateModelField) string {
 	rs := ""
 	for i, arg := range fields {
-		name := common.ToLowerSnakeCase(arg.Name)
+		name := common.ToLowerSnakeCase(arg.GormName)
 		if i == 0 {
 			rs = fmt.Sprintf("%s=?", name)
 		} else {
@@ -148,9 +148,9 @@ func (tgm *TemplateDataMethod) JoinConditions(fields []gen.TemplateModelField) s
 	rs := ""
 	for i, arg := range fields {
 		if i == 0 {
-			rs = fmt.Sprintf("%s %s", arg.Name, arg.Type)
+			rs = fmt.Sprintf("%s %s", common.ToLowerCamelCase(arg.Name), arg.Type)
 		} else {
-			rs = fmt.Sprintf("%s, %s %s", rs, arg.Name, arg.Type)
+			rs = fmt.Sprintf("%s, %s %s", rs, common.ToLowerCamelCase(arg.Name), arg.Type)
 		}
 	}
 	return rs
@@ -172,7 +172,7 @@ func (tgm *TemplateDataMethod) parseMethodFuncsToTemplate(tp *template.Template,
 	return nil
 }
 
-func (tgm *TemplateDataMethod) ParseIndexToMethod() error {
+func (tgm *TemplateDataMethod) ParseIndexToMethod(templateMethodMap, templateMethodFieldUniqMap, templateMethodUniqMap map[string]string) error {
 	var err error
 	td := TemplateDataMethodFunc{
 		ModelName:  tgm.ModelName,
@@ -215,7 +215,6 @@ func (tgm *TemplateDataMethod) ParseIndexToMethod() error {
 	}
 
 	for k, tpMethod := range templateMethodUniqMap {
-
 		if err = tgm.parseMethodFuncsToTemplate(tp, td, tpMethod, k); err != nil {
 			return err
 		}
@@ -343,7 +342,26 @@ func (tm *TemplateDataMethod) ParseDstTree(file *dst.File) error {
 
 				if len(field.Names) > 0 {
 					templateField.Name = field.Names[0].Name
+					templateField.JsonName = templateField.Name
 					templateField.Tag = field.Tag.Value
+					tagArr, err := tm.parseTagToTokens(templateField.Tag)
+					if err != nil {
+						return err
+					}
+					for _, s := range tagArr {
+						if strings.Contains(s, types.MODEL_TAG_TYPE__GORM) {
+							gormStr := common.GetDataBetweenFlag(s, "\"", "\"")
+							gormFieldArr := strings.Split(gormStr, ";")
+							for _, s2 := range gormFieldArr {
+								if strings.Contains(s2, "column") {
+									tmpArr := strings.Split(s2, ":")
+									if len(tmpArr) > 1 {
+										templateField.GormName = tmpArr[1]
+									}
+								}
+							}
+						}
+					}
 				}
 
 				if len(field.Decs.NodeDecs.Start) > 0 {

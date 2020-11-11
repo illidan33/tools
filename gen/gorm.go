@@ -40,20 +40,16 @@ type GormField struct {
 	IsKeyField      bool
 	KeyName         string
 	KeyType         types.IndexType
+	IndexFieldSort  int
 	ModelSort       int
 }
 
 type GormIndex struct {
 	Name      string
-	Fields    []GormIndexField
+	Fields    []*GormField
 	Type      types.IndexType
 	Using     string
 	IndexSort int
-}
-
-type GormIndexField struct {
-	GormField
-	IndexFieldSort int
 }
 
 type GormFlags struct {
@@ -194,9 +190,9 @@ func (gt *GormTable) parseLineToTokens(s string) (rs []string, e error) {
 
 func (gt *GormTable) parseIndexFieldString(gi *GormIndex, s string) error {
 	arr := strings.Split(s, ",")
-	fieldsMap := map[string]GormField{}
-	for _, field := range gt.Fields {
-		fieldsMap[field.Name] = field
+	fieldsMap := map[string]*GormField{}
+	for i := 0; i < len(gt.Fields); i++ {
+		fieldsMap[gt.Fields[i].Name] = &gt.Fields[i]
 	}
 	for i, f := range arr {
 		f = gt.getDataBetweenString(f, "`", "`")
@@ -204,11 +200,8 @@ func (gt *GormTable) parseIndexFieldString(gi *GormIndex, s string) error {
 			v.IsKeyField = true
 			v.KeyName = gi.Name
 			v.KeyType = gi.Type
-			tmp := GormIndexField{
-				GormField:      v,
-				IndexFieldSort: i,
-			}
-			gi.Fields = append(gi.Fields, tmp)
+			v.IndexFieldSort = i
+			gi.Fields = append(gi.Fields, v)
 
 		} else {
 			e := fmt.Errorf("Index field not map table field: %s", f)
@@ -237,7 +230,7 @@ func (gt *GormTable) parseLineKey(s string, indexSortNum int) (e error) {
 		Name:      "",
 		Type:      types.INDEX_TYPE__INDEX,
 		Using:     using,
-		Fields:    []GormIndexField{},
+		Fields:    []*GormField{},
 		IndexSort: indexSortNum,
 	}
 	if gt.isPrimaryKey(s) {
@@ -579,24 +572,31 @@ func (gt *GormTableList) Parse(path string, gormFlags GormFlags) ([]TemplateMode
 	return tms, nil
 }
 
+func (gt *GormTable) filterFieldName(s string) string {
+	flag := 0
+	for i := 0; i < len(s); i++ {
+		if _, ok := NumberMap[s[i]]; !ok {
+			flag = i
+			break
+		}
+	}
+	return s[flag:]
+}
+
 func (gt *GormTable) transformGormToModel(tm *TemplateModel, gormFlags GormFlags) (err error) {
 	tm.ModelName = gt.Name
 
 	// fields
 	for _, field := range gt.Fields {
-		// check name's first word is number or not
-		flag := 0
-		for i := 0; i < len(field.Name); i++ {
-			if _, ok := NumberMap[field.Name[i]]; !ok {
-				flag = i
-				break
-			}
-		}
+		noNumName := common.ToUpperCamelCase(gt.filterFieldName(field.Name))
 		tgsf := TemplateModelField{
-			Name:    common.ToUpperCamelCase(field.Name[flag:]),
-			Type:    "",
-			Tag:     "",
-			Comment: field.Comment,
+			Name:     noNumName,
+			GormName: field.Name,
+			JsonName: common.ToLowerSnakeCase(noNumName),
+			Default:  field.Default,
+			Type:     "",
+			Tag:      "",
+			Comment:  field.Comment,
 		}
 
 		tgsf.Type = field.Type
@@ -620,16 +620,16 @@ func (gt *GormTable) transformGormToModel(tm *TemplateModel, gormFlags GormFlags
 		}
 		if gormFlags.HasGorm {
 			if gormFlags.IsSimpleGorm {
-				tgsf.Tag = fmt.Sprintf("%s%s:\"column:%s\"", tgsf.Tag, types.MODEL_TAG_TYPE__GORM, field.Name)
+				tgsf.Tag = fmt.Sprintf("%s%s:\"column:%s\"", tgsf.Tag, types.MODEL_TAG_TYPE__GORM, tgsf.GormName)
 			} else {
-				tgsf.Tag = fmt.Sprintf("%s%s:\"column:%s;type:%s;%sdefault:%s\"", tgsf.Tag, types.MODEL_TAG_TYPE__GORM, field.Name, field.Type, null, field.Default)
+				tgsf.Tag = fmt.Sprintf("%s%s:\"column:%s;type:%s;%sdefault:%s\"", tgsf.Tag, types.MODEL_TAG_TYPE__GORM, tgsf.GormName, field.Type, null, field.Default)
 			}
 		}
 		if gormFlags.HasJson {
-			tgsf.Tag = fmt.Sprintf("%s %s:\"%s\"", tgsf.Tag, types.MODEL_TAG_TYPE__JSON, field.Name)
+			tgsf.Tag = fmt.Sprintf("%s %s:\"%s\"", tgsf.Tag, types.MODEL_TAG_TYPE__JSON, tgsf.JsonName)
 		}
 		if gormFlags.HasDefault {
-			tgsf.Tag = fmt.Sprintf("%s %s:\"%s\"", tgsf.Tag, types.MODEL_TAG_TYPE__DEFAULT, field.Default)
+			tgsf.Tag = fmt.Sprintf("%s %s:\"%s\"", tgsf.Tag, types.MODEL_TAG_TYPE__DEFAULT, tgsf.Default)
 		}
 
 		tgsf.Tag += "`"
@@ -655,15 +655,17 @@ func (gt *GormTable) transformGormToModel(tm *TemplateModel, gormFlags GormFlags
 	if len(gt.Indexs) > 0 {
 		for _, index := range indexs {
 			str := ""
-			for kk, field := range index.Fields {
-				if kk == 0 {
+			for i := 0; i < len(index.Fields); i++ {
+				field := index.Fields[i]
+				name := common.ToUpperCamelCase(gt.filterFieldName(field.Name))
+				if i == 0 {
 					if index.Type == types.INDEX_TYPE__PRIMARY {
-						str = fmt.Sprintf("\n// @%s %s %s", types.SQLCONTENTTYPE__DEF, index.Type.KeyLowerString(), common.ToUpperCamelCase(field.Name))
+						str = fmt.Sprintf("\n// @%s %s %s", types.SQLCONTENTTYPE__DEF, index.Type.KeyLowerString(), name)
 					} else if index.Type == types.INDEX_TYPE__UNIQUE_INDEX || index.Type == types.INDEX_TYPE__INDEX || index.Type == types.INDEX_TYPE__FOREIGN_INDEX {
-						str = fmt.Sprintf("\n// @%s %s:%s %s", types.SQLCONTENTTYPE__DEF, index.Type.KeyLowerString(), index.Name, common.ToUpperCamelCase(field.Name))
+						str = fmt.Sprintf("\n// @%s %s:%s %s", types.SQLCONTENTTYPE__DEF, index.Type.KeyLowerString(), index.Name, name)
 					}
 				} else {
-					str = fmt.Sprintf("%s %s", str, common.ToUpperCamelCase(field.Name))
+					str = fmt.Sprintf("%s %s", str, name)
 				}
 			}
 			tm.ModelComment += str

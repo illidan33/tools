@@ -1,4 +1,4 @@
-package dao
+package dao_sync
 
 import (
 	"bytes"
@@ -41,10 +41,13 @@ func (tpData *CmdKipleInterfaceCheck) Init() error {
 
 	// for test
 	if tpData.IsDebug {
-		os.Setenv("GOFILE", "user_dao_impl.go")
-		os.Setenv("GOPACKAGE", "model")
-		tpData.Environments.CmdDir = filepath.Join(common.GetGoPath(), "/src/github.com/illidan33/gotest/tools_test/example/model")
-		tpData.Environments.CmdFileName = "user_profiles_dao.go"
+		fmt.Printf("%#v\n", tpData.Environments)
+		if tpData.Environments.PackageName == "main" {
+			os.Setenv("GOFILE", "user_dao_impl.go")
+			os.Setenv("GOPACKAGE", "model")
+			tpData.Environments.CmdDir = filepath.Join(common.GetGoPath(), "/src/github.com/illidan33/gotest/tools_test/example/model")
+			tpData.Environments.CmdFileName = "user_profiles_dao.go"
+		}
 	}
 	return nil
 }

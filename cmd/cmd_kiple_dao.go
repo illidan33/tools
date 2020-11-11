@@ -2,11 +2,11 @@ package cmd
 
 import (
 	"github.com/illidan33/tools/common"
-	"github.com/illidan33/tools/kiple/dao"
+	"github.com/illidan33/tools/kiple/dao_create"
 	"github.com/spf13/cobra"
 )
 
-var kipleDao dao.CmdKipleDao
+var kipleDao dao_create.CmdKipleDao
 var cmdkipleDao = &cobra.Command{
 	Use:   "daocreate",
 	Short: "generate methods of entity dao",

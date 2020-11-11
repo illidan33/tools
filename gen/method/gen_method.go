@@ -9,6 +9,7 @@ import (
 type CmdGenMethod struct {
 	IsDebug   bool
 	ModelName string
+	ModelFile string
 
 	Environments common.CmdFilePath
 	Template     TemplateDataMethod
@@ -23,9 +24,6 @@ func (cmdtp *CmdGenMethod) Init() error {
 	if err != nil {
 		return err
 	}
-	if cmdtp.Environments.CmdFileName == "" {
-		cmdtp.Environments.CmdFileName = common.ToLowerSnakeCase(cmdtp.ModelName) + ".go"
-	}
 
 	// for test
 	if cmdtp.IsDebug {
@@ -35,19 +33,32 @@ func (cmdtp *CmdGenMethod) Init() error {
 			cmdtp.Environments.CmdDir = filepath.Join(common.GetGoPath(), "/src/github.com/illidan33/gotest/tools_test/example/model")
 		}
 	}
+	if cmdtp.Environments.CmdFileName == "" {
+		cmdtp.Environments.CmdFileName = common.ToLowerSnakeCase(cmdtp.ModelName) + ".go"
+	}
+	if cmdtp.ModelFile == "" {
+		cmdtp.ModelFile = filepath.Join(cmdtp.Environments.CmdDir, cmdtp.Environments.CmdFileName)
+	}
 	cmdtp.Template.PackageName = cmdtp.Environments.PackageName
 	cmdtp.Template.ModelName = cmdtp.ModelName
+
+	if cmdtp.ModelName == "" {
+		return fmt.Errorf("need model name")
+	}
+	if cmdtp.ModelFile == "" || common.IsDir(cmdtp.ModelFile) {
+		return fmt.Errorf("model path need a dir")
+	}
 
 	return nil
 }
 func (cmdtp *CmdGenMethod) Parse() error {
-	tmpPath, err := common.GetImportPath(cmdtp.Environments.CmdDir)
-	if err != nil {
-		return err
-	}
-	if err := cmdtp.Template.ParseImportFile(tmpPath); err != nil {
-		fmt.Println(err) // 记录错误，不打断，退化到由语法树来解析字段
-	}
+	//tmpPath, err := common.GetImportPath(cmdtp.Environments.CmdDir)
+	//if err != nil {
+	//	return err
+	//}
+	//if err := cmdtp.Template.ParseImportFile(tmpPath); err != nil {
+	//	fmt.Println(err) // 记录错误，不打断，退化到由语法树来解析字段
+	//}
 
 	filePath := filepath.Join(cmdtp.Environments.CmdDir, cmdtp.Environments.CmdFileName)
 	dstTree, err := cmdtp.Template.GetDstTree(filePath)
@@ -57,7 +68,7 @@ func (cmdtp *CmdGenMethod) Parse() error {
 	if err = cmdtp.Template.ParseDstTree(dstTree); err != nil {
 		return err
 	}
-	if err = cmdtp.Template.ParseIndexToMethod(); err != nil {
+	if err = cmdtp.Template.ParseIndexToMethod(templateMethodMap, templateMethodFieldUniqMap, templateMethodUniqMap); err != nil {
 		return err
 	}
 

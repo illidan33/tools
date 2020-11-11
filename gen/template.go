@@ -30,10 +30,13 @@ type TemplateModel struct {
 }
 
 type TemplateModelField struct {
-	Name    string
-	Type    string
-	Tag     string
-	Comment string
+	Name     string
+	GormName string
+	JsonName string
+	Type     string
+	Default  string
+	Tag      string
+	Comment  string
 }
 
 type TemplateGenModelFunc struct {

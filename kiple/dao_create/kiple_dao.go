@@ -1,4 +1,4 @@
-package dao
+package dao_create
 
 import (
 	"bytes"
@@ -18,8 +18,6 @@ type CmdKipleDao struct {
 	Template     KipleTemplateDao
 }
 
-const implNameFlag = "Impl"
-
 func (cmdtp *CmdKipleDao) String() string {
 	return cmdtp.InterfaceName
 }
@@ -37,7 +35,6 @@ func (cmdtp *CmdKipleDao) Init() (err error) {
 		}
 	}
 	cmdtp.Template.PackageName = cmdtp.Environments.PackageName
-	cmdtp.Template.ModelName = cmdtp.InterfaceName + implNameFlag
 	cmdtp.Template.InterfaceName = cmdtp.InterfaceName
 	return
 }

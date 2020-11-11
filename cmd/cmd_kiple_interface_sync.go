@@ -2,11 +2,11 @@ package cmd
 
 import (
 	"github.com/illidan33/tools/common"
-	dao2 "github.com/illidan33/tools/kiple/common"
+	"github.com/illidan33/tools/kiple/dao_sync"
 	"github.com/spf13/cobra"
 )
 
-var kipleInterfaceCheck dao2.CmdKipleInterfaceCheck
+var kipleInterfaceCheck dao_sync.CmdKipleInterfaceCheck
 var cmdkipleInterfaceCheck = &cobra.Command{
 	Use:   "daosync",
 	Short: "sync funcs from impl to dao interface",
