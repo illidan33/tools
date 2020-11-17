@@ -17,6 +17,7 @@ var cmdkipleDao = &cobra.Command{
 
 func init() {
 	cmdkipleDao.Flags().StringVarP(&kipleDao.InterfaceName, "interface", "i", "", "(required) the interface name which you want to create")
+	cmdkipleDao.Flags().StringVarP(&kipleDao.ModelName, "moduleName", "m", "", "(required) the module name which you want to generate from")
 	cmdkipleDao.Flags().StringVarP(&kipleDao.Entity, "entity", "e", "", "(required) the entity place where generating code from")
 	cmdkipleDao.Flags().BoolVarP(&kipleDao.IsDebug, "debug", "d", false, "open debug flag,default: false")
 

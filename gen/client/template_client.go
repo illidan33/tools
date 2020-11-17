@@ -7,7 +7,7 @@ import (
 	"github.com/illidan33/tools/common"
 	"github.com/illidan33/tools/gen"
 	"github.com/illidan33/tools/gen/util/types"
-	"github.com/illidan33/tools/httptool"
+	"github.com/illidan33/tools/util/httptool"
 	"io/ioutil"
 	"os"
 	"regexp"

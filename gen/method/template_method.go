@@ -47,7 +47,7 @@ var templateMethodMap = map[string]string{
 		return nil
 	}`,
 	"BatchFetchBy%s": `func ({{var $.ModelName}} *{{$.ModelName}}) BatchFetchBy{{$.FuncName}}(db *gorm.DB)({{var $.ModelName}}List []{{$.ModelName}}, err error) {
-		err = db.Where("{{$.WhereStr}}", {{$.FieldStr}}).Find(&{{var $.ModelName}}List).Error
+		err = db.Model({{var $.ModelName}}).Where("{{$.WhereStr}}", {{$.FieldStr}}).Find(&{{var $.ModelName}}List).Error
 		return 
 	}`,
 }
@@ -60,17 +60,13 @@ var templateMethodFieldUniqMap = map[string]string{
 }
 
 var templateMethodUniqMap = map[string]string{
-	"Create": `func ({{var $.ModelName}} *{{$.ModelName}}) Create(db *gorm.DB) error {
-		if err := db.Create({{var $.ModelName}}).Error; err != nil{
-			return err
-		}
-		return nil
+	"Create": `func ({{var $.ModelName}} *{{$.ModelName}}) Create(db *gorm.DB) (err error) {
+		err = db.Create({{var $.ModelName}}).Error
+		return 
 	}`,
-	"Delete": `func ({{var $.ModelName}} *{{$.ModelName}}) Delete(db *gorm.DB) error {
-		if err := db.Delete({{var $.ModelName}}).Error; err != nil {
-			return err
-		}
-		return nil
+	"Delete": `func ({{var $.ModelName}} *{{$.ModelName}}) Delete(db *gorm.DB) (err error) {
+		err = db.Delete({{var $.ModelName}}).Error
+		return 
 	}`,
 	"FetchList": `func ({{var $.ModelName}} *{{$.ModelName}}) FetchList(db *gorm.DB, size int32, offset int32, args map[string]interface{})({{var $.ModelName}}List []{{$.ModelName}}, count int32, err error) {
 		if size == -1 {
@@ -326,8 +322,6 @@ func (tm *TemplateDataMethod) ParseDstTree(file *dst.File) error {
 		}
 		if tm.ModelName == "" {
 			tm.ModelName = tf.Name.Name
-		} else if tm.ModelName != tf.Name.Name {
-			continue
 		}
 
 		fieldMap := map[string]gen.TemplateModelField{}
@@ -402,6 +396,8 @@ func (tm *TemplateDataMethod) ParseDstTree(file *dst.File) error {
 				return err
 			}
 		}
+
+		break
 	}
 	return nil
 }

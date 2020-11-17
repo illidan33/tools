@@ -11,6 +11,7 @@ import (
 
 type CmdKipleDao struct {
 	InterfaceName string
+	ModelName     string
 	Entity        string
 	IsDebug       bool
 
@@ -58,7 +59,7 @@ func (cmdtp *CmdKipleDao) Parse() (err error) {
 		if err != nil {
 			return err
 		}
-		cmdtp.Template.AddPackage("entity", pkgPath)
+		cmdtp.Template.AddPackage("entityPackage", pkgPath)
 	}
 
 	var dstTree *dst.File
@@ -69,17 +70,18 @@ func (cmdtp *CmdKipleDao) Parse() (err error) {
 	if err = cmdtp.Template.ParseKipleDstTree(dstTree); err != nil {
 		return
 	}
+	cmdtp.Template.ModelName = cmdtp.ModelName
 	if err = cmdtp.Template.ParseKipleIndexToMethod(); err != nil {
 		return
 	}
 
 	var bf *bytes.Buffer
-	bf, err = cmdtp.Template.ParseTemplate(templateMethodTxt, cmdtp.Template.ModelName, cmdtp.Template)
+	bf, err = cmdtp.Template.ParseTemplate(templateDaoTxt, cmdtp.Template.ModelName, cmdtp.Template)
 	if err != nil {
 		return
 	}
 
-	dstFilePath := filepath.Join(cmdtp.Environments.CmdDir, common.ToLowerSnakeCase(cmdtp.InterfaceName)+".go")
+	dstFilePath := filepath.Join(cmdtp.Environments.CmdDir, common.ToLowerSnakeCase(cmdtp.InterfaceName)+"_generate.go")
 	err = cmdtp.Template.FormatCodeToFile(dstFilePath, bf)
 	if err != nil {
 		return
