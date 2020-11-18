@@ -81,7 +81,7 @@ func (cmdtp *CmdKipleDao) Parse() (err error) {
 		return
 	}
 
-	dstFilePath := filepath.Join(cmdtp.Environments.CmdDir, common.ToLowerSnakeCase(cmdtp.InterfaceName)+"_generate.go")
+	dstFilePath := filepath.Join(cmdtp.Environments.CmdDir, common.ToLowerSnakeCase(cmdtp.InterfaceName)+".go")
 	err = cmdtp.Template.FormatCodeToFile(dstFilePath, bf)
 	if err != nil {
 		return
