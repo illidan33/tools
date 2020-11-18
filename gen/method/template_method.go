@@ -320,9 +320,8 @@ func (tm *TemplateDataMethod) ParseDstTree(file *dst.File) error {
 		if !ok {
 			return fmt.Errorf("can not change to TypeSpec: %#v", gd.Specs)
 		}
-		if tm.ModelName == "" {
-			tm.ModelName = tf.Name.Name
-		}
+		// this entity model name
+		tm.ModelName = tf.Name.Name
 
 		fieldMap := map[string]gen.TemplateModelField{}
 		if len(tm.TemplateModelFields) == 0 {

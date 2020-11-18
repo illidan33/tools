@@ -7,11 +7,10 @@ import (
 	"github.com/dave/dst"
 	"github.com/illidan33/tools/common"
 	"path/filepath"
+	"strings"
 )
 
 type CmdKipleDao struct {
-	InterfaceName string
-	ModelName     string
 	Entity        string
 	IsDebug       bool
 
@@ -20,7 +19,7 @@ type CmdKipleDao struct {
 }
 
 func (cmdtp *CmdKipleDao) String() string {
-	return cmdtp.InterfaceName
+	return cmdtp.Template.InterfaceName
 }
 func (cmdtp *CmdKipleDao) Init() (err error) {
 	cmdtp.Environments, err = common.GetGenEnvironmentValues()
@@ -36,7 +35,6 @@ func (cmdtp *CmdKipleDao) Init() (err error) {
 		}
 	}
 	cmdtp.Template.PackageName = cmdtp.Environments.PackageName
-	cmdtp.Template.InterfaceName = cmdtp.InterfaceName
 	return
 }
 
@@ -59,6 +57,7 @@ func (cmdtp *CmdKipleDao) Parse() (err error) {
 		if err != nil {
 			return err
 		}
+		pkgPath = strings.TrimPrefix(pkgPath, "github.com/m2c/")
 		cmdtp.Template.AddPackage("entityPackage", pkgPath)
 	}
 
@@ -70,7 +69,6 @@ func (cmdtp *CmdKipleDao) Parse() (err error) {
 	if err = cmdtp.Template.ParseKipleDstTree(dstTree); err != nil {
 		return
 	}
-	cmdtp.Template.ModelName = cmdtp.ModelName
 	if err = cmdtp.Template.ParseKipleIndexToMethod(); err != nil {
 		return
 	}
@@ -81,7 +79,7 @@ func (cmdtp *CmdKipleDao) Parse() (err error) {
 		return
 	}
 
-	dstFilePath := filepath.Join(cmdtp.Environments.CmdDir, common.ToLowerSnakeCase(cmdtp.InterfaceName)+".go")
+	dstFilePath := filepath.Join(cmdtp.Environments.CmdDir, common.ToLowerSnakeCase(cmdtp.Template.InterfaceName)+".go")
 	err = cmdtp.Template.FormatCodeToFile(dstFilePath, bf)
 	if err != nil {
 		return

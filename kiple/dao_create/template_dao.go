@@ -16,6 +16,8 @@ import (
 var templateDaoTxt = `package {{$.PackageName}}
 
 import (
+	"fmt"
+	"reflect"
 	"github.com/jinzhu/gorm"
 	"github.com/m2c/kiplestar"
 	{{range $pkg := $.PackageList}}
@@ -32,7 +34,7 @@ type {{$.InterfaceName}} interface {
 
 func {{$.InterfaceName}}Instance() {{$.InterfaceName}} {
 	return &{{$.ModelName}}{
-		db: kiplestar.GetKipleServerInstance().DB("replace with your db name").DB(),
+		db: kiplestar.GetKipleServerInstance().DB("{{$.DbName}}").DB(),
 	}
 }
 
@@ -52,7 +54,7 @@ var templateMethodMap = map[string]string{
 		err = d.db.Model({{var $.EntityName}}).Where("{{$.WhereStr}}", {{$.ConditionFieldStr}}).First(&{{var $.EntityName}}).Error
 		return 
 	}`,
-	"UpdateBy%sWithStruct": `func (d *{{$.ModelName}}) {{$.FuncName}}({{var $.EntityName}} {{$.EntityPackageName}}{{$.EntityName}}) (err error) {
+	"UpdateBy%sWithStruct": `func (d *{{$.ModelName}}) {{$.FuncName}}({{var $.EntityName}} *{{$.EntityPackageName}}{{$.EntityName}}) (err error) {
 		err = d.db.Model({{var $.EntityName}}).Where("{{$.WhereStr}}", {{$.FieldStr}}).Updates({{var $.EntityName}}).Error
 		return nil
 	}`,
@@ -71,32 +73,63 @@ var templateMethodFiedUniqMap = map[string]string{
 }
 
 var templateMethodUniqMap = map[string]string{
-	"Create": `func (d *{{$.ModelName}}) Create({{var $.EntityName}} {{$.EntityPackageName}}{{$.EntityName}}) (err error) {
+	"Create": `func (d *{{$.ModelName}}) Create({{var $.EntityName}} *{{$.EntityPackageName}}{{$.EntityName}}) (err error) {
 		err = d.db.Create({{var $.EntityName}}).Error
 		return 
 	}`,
-	"Delete": `func (d *{{$.ModelName}}) Delete({{var $.EntityName}} {{$.EntityPackageName}}{{$.EntityName}}) (err error) {
+	"Delete": `func (d *{{$.ModelName}}) Delete({{var $.EntityName}} *{{$.EntityPackageName}}{{$.EntityName}}) (err error) {
 		err = d.db.Delete({{var $.EntityName}}).Error
 		return 
 	}`,
-	"FetchList": `func (d *{{$.ModelName}}) FetchList(size int32, offset int32, sql *string, args ...interface{}) ({{var $.EntityName}}List []{{$.EntityPackageName}}{{$.EntityName}}, count int32, err error) {
+	"BatchFetchAll": `func (d *{{$.ModelName}}) BatchFetchAll(args interface{}) ({{var $.EntityName}}List []{{$.EntityPackageName}}{{$.EntityName}}, err error) {
+		{{var $.EntityName}}List, err = d.FetchList(-1, 0, nil, nil, args)
+		return
+	}`,
+	"FetchOne": `func (d *{{$.ModelName}}) FetchOne(args interface{}) ({{var $.EntityName}}List []{{$.EntityPackageName}}{{$.EntityName}}, err error) {
+		{{var $.EntityName}}List, err = d.FetchList(1, 0, nil, nil, args)
+		return
+	}`,
+	"FetchList": `func (d *{{$.ModelName}}) FetchList(size int32, offset int32, count *int32, sql *string, args ...interface{}) ({{var $.EntityName}}List []{{$.EntityPackageName}}{{$.EntityName}}, err error) {
 		m := {{$.EntityPackageName}}{{$.EntityName}}{}
+		var db *gorm.DB
 		if sql != nil {
 			if size == -1 {
-				err = d.db.Model(m).Where(*sql, args...).Offset(offset).Find(&{{var $.EntityName}}List).Count(&count).Error
+				db = d.db.Model(m).Where(*sql, args...).Offset(offset).Find(&{{var $.EntityName}}List).Count(&count)
 			} else {
-				err = d.db.Model(m).Where(*sql, args...).Offset(offset).Limit(size).Find(&{{var $.EntityName}}List).Count(&count).Error
+				db = d.db.Model(m).Where(*sql, args...).Offset(offset).Limit(size).Find(&{{var $.EntityName}}List).Count(&count)
 			}
 		} else {
-			if size == -1 {
-				err = d.db.Model(m).Where(args).Offset(offset).Find(&{{var $.EntityName}}List).Count(&count).Error
-			} else {
-				err = d.db.Model(m).Where(args).Offset(offset).Limit(size).Find(&{{var $.EntityName}}List).Count(&count).Error
+			if len(args) > 1 {
+				err = fmt.Errorf("args should be one,when sql is nil.")
+				return
+			}
+			t := reflect.TypeOf(args[0])
+			switch t.Kind() {
+			case reflect.Struct:
+				if size == -1 {
+					db = d.db.Where(args[0]).Offset(offset).Find(&{{var $.EntityName}}List).Count(&count)
+				} else {
+					db = d.db.Where(args[0]).Offset(offset).Limit(size).Find(&{{var $.EntityName}}List).Count(&count)
+				}
+			case reflect.Map:
+				if size == -1 {
+					db = d.db.Where(args[0]).Offset(offset).Find(&{{var $.EntityName}}List).Count(&count)
+				} else {
+					db = d.db.Where(args[0]).Offset(offset).Limit(size).Find(&{{var $.EntityName}}List).Count(&count)
+				}
+			default:
+				err = fmt.Errorf("args should be map or struct when sql is nil, but give %s.", t.Kind().String())
+				return
 			}
 		}
-		if gorm.IsRecordNotFoundError(err) {
-			count = 0
-			err = nil
+		err = db.Error
+		if err != nil {
+			if gorm.IsRecordNotFoundError(err) {
+				count = nil
+				err = nil
+			}
+		} else if count != nil {
+			db.Count(&count)
 		}
 		return
 	}`,
@@ -106,6 +139,7 @@ type KipleTemplateDao struct {
 	InterfaceName        string
 	EntityName           string
 	EntityPackageName    string
+	DbName               string
 	CmdKipleDaoFuncNames []string
 
 	method.TemplateDataMethod
@@ -166,12 +200,17 @@ func (tgm *KipleTemplateDao) ParseKipleIndexToMethod() error {
 }
 
 func (tm *KipleTemplateDao) ParseKipleDstTree(file *dst.File) error {
+	sourceModelName := tm.ModelName
+	tm.ModelName = ""
+
 	err := tm.ParseDstTree(file)
 	if err != nil {
 		return err
 	}
+
 	tm.EntityPackageName = file.Name.Name
 	tm.EntityName = tm.ModelName
+	tm.ModelName = sourceModelName
 
 	return nil
 }
