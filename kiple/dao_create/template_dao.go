@@ -56,12 +56,12 @@ var templateMethodMap = map[string]string{
 	}`,
 	"UpdateBy%sWithStruct": `func (d *{{$.ModelName}}) {{$.FuncName}}({{var $.EntityName}} *{{$.EntityPackageName}}{{$.EntityName}}) (err error) {
 		err = d.db.Model({{var $.EntityName}}).Where("{{$.WhereStr}}", {{$.FieldStr}}).Updates({{var $.EntityName}}).Error
-		return nil
+		return 
 	}`,
 	"UpdateBy%sWithMap": `func (d *{{$.ModelName}}) {{$.FuncName}}({{$.ConditionStr}}, args map[string]interface{}) (err error) {
 		entt := {{$.EntityPackageName}}{{$.EntityName}}{}
 		err = d.db.Model(entt).Where("{{$.WhereStr}}", {{$.ConditionFieldStr}}).Updates(args).Error
-		return nil
+		return 
 	}`,
 }
 
@@ -94,9 +94,9 @@ var templateMethodUniqMap = map[string]string{
 		var db *gorm.DB
 		if sql != nil {
 			if size == -1 {
-				db = d.db.Model(m).Where(*sql, args...).Offset(offset).Find(&{{var $.EntityName}}List).Count(&count)
+				db = d.db.Model(m).Where(*sql, args...).Offset(offset).Find(&{{var $.EntityName}}List)
 			} else {
-				db = d.db.Model(m).Where(*sql, args...).Offset(offset).Limit(size).Find(&{{var $.EntityName}}List).Count(&count)
+				db = d.db.Model(m).Where(*sql, args...).Offset(offset).Limit(size).Find(&{{var $.EntityName}}List)
 			}
 		} else {
 			if len(args) > 1 {
@@ -107,15 +107,15 @@ var templateMethodUniqMap = map[string]string{
 			switch t.Kind() {
 			case reflect.Struct:
 				if size == -1 {
-					db = d.db.Where(args[0]).Offset(offset).Find(&{{var $.EntityName}}List).Count(&count)
+					db = d.db.Where(args[0]).Offset(offset).Find(&{{var $.EntityName}}List)
 				} else {
-					db = d.db.Where(args[0]).Offset(offset).Limit(size).Find(&{{var $.EntityName}}List).Count(&count)
+					db = d.db.Where(args[0]).Offset(offset).Limit(size).Find(&{{var $.EntityName}}List)
 				}
 			case reflect.Map:
 				if size == -1 {
-					db = d.db.Where(args[0]).Offset(offset).Find(&{{var $.EntityName}}List).Count(&count)
+					db = d.db.Where(args[0]).Offset(offset).Find(&{{var $.EntityName}}List)
 				} else {
-					db = d.db.Where(args[0]).Offset(offset).Limit(size).Find(&{{var $.EntityName}}List).Count(&count)
+					db = d.db.Where(args[0]).Offset(offset).Limit(size).Find(&{{var $.EntityName}}List)
 				}
 			default:
 				err = fmt.Errorf("args should be map or struct when sql is nil, but give %s.", t.Kind().String())

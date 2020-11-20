@@ -87,11 +87,11 @@ var FieldType = map[string]string{
 	"MEDIUMBLOB": "[]byte",
 	"BLOB":       "[]byte",
 	"LONGBLOB":   "[]byte",
-	"DATE":       "*time.Time",
-	"TIME":       "*time.Time",
-	"DATETIME":   "*time.Time",
-	"TIMESTAMP":  "*time.Time",
-	"YEAR":       "*time.Time",
+	"DATE":       "time.Time",
+	"TIME":       "time.Time",
+	"DATETIME":   "time.Time",
+	"TIMESTAMP":  "time.Time",
+	"YEAR":       "time.Time",
 }
 
 var NumberMap = map[byte]bool{

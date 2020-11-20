@@ -3,7 +3,6 @@ package dao_sync
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/illidan33/tools/common"
@@ -38,10 +37,8 @@ func (cmdtp *CmdKipleInterfaceCheck) Init() error {
 	if cmdtp.IsDebug {
 		fmt.Printf("%#v\n", cmdtp.Environments)
 		if cmdtp.Environments.PackageName == "main" {
-			os.Setenv("GOFILE", "user_dao_impl.go")
-			os.Setenv("GOPACKAGE", "model")
-			cmdtp.Environments.CmdDir = filepath.Join(common.GetGoPath(), "/src/github.com/illidan33/gotest/tools_test/example/entity")
-			cmdtp.Environments.CmdFileName = "user_profiles_dao.go"
+			cmdtp.Environments.CmdDir = filepath.Join(common.GetGoPath(), "/src/github.com/m2c/kiplelive-agent/service")
+			cmdtp.Environments.CmdFileName = "user_service.go"
 		}
 	}
 	cmdtp.Template.InterfaceName = cmdtp.InterfaceName

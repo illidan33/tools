@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/dave/dst"
 	"github.com/dave/dst/decorator"
+	"github.com/illidan33/tools/common"
 	"github.com/illidan33/tools/gen"
 	"github.com/mohae/deepcopy"
 	"go/format"
@@ -17,6 +18,24 @@ type KipleTemplateDaoSync struct {
 
 	gen.GenTemplate
 	gen.TemplateModel
+}
+
+func (tm *KipleTemplateDaoSync) copyField(field *dst.Field) *dst.Field {
+	newField := dst.Field{
+		Names: []*dst.Ident{},
+		Type:  deepcopy.Copy(field.Type).(dst.Expr),
+		Tag:   deepcopy.Copy(field.Tag).(*dst.BasicLit),
+		Decs: dst.FieldDecorations{
+			NodeDecs: dst.NodeDecs{},
+			Type:     dst.Decorations{},
+		},
+	}
+	if field.Names != nil {
+		for _, name := range field.Names {
+			newField.Names = append(newField.Names, dst.NewIdent(name.Name))
+		}
+	}
+	return &newField
 }
 
 func (tm *KipleTemplateDaoSync) copyKipleNode(ffv *dst.FuncDecl) *dst.Field {
@@ -39,30 +58,12 @@ func (tm *KipleTemplateDaoSync) copyKipleNode(ffv *dst.FuncDecl) *dst.Field {
 		Decs: dst.FuncTypeDecorations{},
 	}
 	for i := 0; i < len(ffv.Type.Results.List); i++ {
-		field := ffv.Type.Results.List[i]
-		newField := dst.Field{
-			Names: []*dst.Ident{dst.NewIdent(field.Names[0].Name)},
-			Type:  deepcopy.Copy(field.Type).(dst.Expr),
-			Tag:   deepcopy.Copy(field.Tag).(*dst.BasicLit),
-			Decs: dst.FieldDecorations{
-				NodeDecs: dst.NodeDecs{},
-				Type:     dst.Decorations{},
-			},
-		}
-		newType.Results.List = append(newType.Results.List, &newField)
+		newField := tm.copyField(ffv.Type.Results.List[i])
+		newType.Results.List = append(newType.Results.List, newField)
 	}
 	for i := 0; i < len(ffv.Type.Params.List); i++ {
-		field := ffv.Type.Params.List[i]
-		newField := dst.Field{
-			Names: []*dst.Ident{dst.NewIdent(field.Names[0].Name)},
-			Type:  deepcopy.Copy(field.Type).(dst.Expr),
-			Tag:   deepcopy.Copy(field.Tag).(*dst.BasicLit),
-			Decs: dst.FieldDecorations{
-				NodeDecs: dst.NodeDecs{},
-				Type:     dst.Decorations{},
-			},
-		}
-		newType.Params.List = append(newType.Params.List, &newField)
+		newField := tm.copyField(ffv.Type.Params.List[i])
+		newType.Params.List = append(newType.Params.List, newField)
 	}
 	ffnew.Type = &newType
 	return &ffnew
@@ -94,8 +95,18 @@ func (tm *KipleTemplateDaoSync) FindInterfaceMethods(node *dst.File) (*dst.File,
 				continue
 			}
 			if ffvse, ok := (ffv.Recv.List[0].Type).(*dst.StarExpr); ok && ffvse.X.(*dst.Ident).Name == tm.ModelName {
-				ffnew := tm.copyKipleNode(ffv)
-				newList = append(newList, ffnew)
+				if common.IsUpperLetter(rune(ffv.Name.Name[0])) {
+					fmt.Println(ffv.Name.Name)
+					ffnew := tm.copyKipleNode(ffv)
+					newList = append(newList, ffnew)
+				}
+			}
+			if ffvse, ok := (ffv.Recv.List[0].Type).(*dst.Ident); ok && ffvse.Name == tm.ModelName {
+				if common.IsUpperLetter(rune(ffv.Name.Name[0])) {
+					fmt.Println(ffv.Name.Name)
+					ffnew := tm.copyKipleNode(ffv)
+					newList = append(newList, ffnew)
+				}
 			}
 		}
 	}
