@@ -16,8 +16,6 @@ import (
 var templateDaoTxt = `package {{$.PackageName}}
 
 import (
-	"fmt"
-	"reflect"
 	"github.com/jinzhu/gorm"
 	"github.com/m2c/kiplestar"
 	{{range $pkg := $.PackageList}}
@@ -25,7 +23,7 @@ import (
 	{{end}}
 )
 
-//go:generate tools kiple daosync -i {{$.InterfaceName}} -m {{$.ModelName}}
+//go:generate tools kiple methodsync -i {{$.InterfaceName}} -m {{$.ModelName}}
 type {{$.InterfaceName}} interface {
 	{{range $funcName := $.CmdKipleDaoFuncNames}}
 	{{html $funcName}}
@@ -42,8 +40,21 @@ type {{$.ModelName}} struct {
 	db *gorm.DB
 }
 
+`
+var templateDaoGenTxt = `// Code generate by 'tools kiple daocreate', Do not edit!
+
+package {{$.PackageName}}
+
+import (
+	"fmt"
+	"github.com/jinzhu/gorm"
+	"reflect"
+	{{range $pkg := $.PackageList}}
+	"{{html $pkg}}"
+	{{end}}
+)
+
 {{range $func := .TemplateDataMethodFuncs}}
-// Code generate by 'tools kiple daocreate', Do not edit!
 {{html $func}}
 {{end}}
 
@@ -52,6 +63,10 @@ type {{$.ModelName}} struct {
 var templateMethodMap = map[string]string{
 	"FetchBy%s": `func (d *{{$.ModelName}}) {{$.FuncName}}({{$.ConditionStr}}) ({{var $.EntityName}} {{$.EntityPackageName}}{{$.EntityName}},err error) {
 		err = d.db.Model({{var $.EntityName}}).Where("{{$.WhereStr}}", {{$.ConditionFieldStr}}).First(&{{var $.EntityName}}).Error
+		return 
+	}`,
+	"BatchFetchBy%s": `func (d *{{$.ModelName}}) {{$.FuncName}}({{$.ConditionStr}}) ({{var $.EntityName}}List []{{$.EntityPackageName}}{{$.EntityName}},err error) {
+		err = d.db.Model(&{{$.EntityPackageName}}{{$.EntityName}}{}).Where("{{$.WhereStr}}", {{$.ConditionFieldStr}}).Find(&{{var $.EntityName}}List).Error
 		return 
 	}`,
 	"UpdateBy%sWithStruct": `func (d *{{$.ModelName}}) {{$.FuncName}}({{var $.EntityName}} *{{$.EntityPackageName}}{{$.EntityName}}) (err error) {
@@ -81,12 +96,16 @@ var templateMethodUniqMap = map[string]string{
 		err = d.db.Delete({{var $.EntityName}}).Error
 		return 
 	}`,
-	"BatchFetchAll": `func (d *{{$.ModelName}}) BatchFetchAll(args interface{}) ({{var $.EntityName}}List []{{$.EntityPackageName}}{{$.EntityName}}, err error) {
-		{{var $.EntityName}}List, err = d.FetchList(-1, 0, nil, nil, args)
+	"BatchFetchBySql": `func (d *{{$.ModelName}}) BatchFetchBySql(sql string, args ...interface{}) ({{var $.EntityName}}List []{{$.EntityPackageName}}{{$.EntityName}}, err error) {
+		{{var $.EntityName}}List, err = d.FetchList(-1, 0, nil, &sql, args...)
 		return
 	}`,
-	"FetchOne": `func (d *{{$.ModelName}}) FetchOne(args interface{}) ({{var $.EntityName}}List []{{$.EntityPackageName}}{{$.EntityName}}, err error) {
-		{{var $.EntityName}}List, err = d.FetchList(1, 0, nil, nil, args)
+	"FetchOneBySql": `func (d *{{$.ModelName}}) FetchOneBySql(sql string,args ...interface{}) ({{var $.EntityName}} {{$.EntityPackageName}}{{$.EntityName}}, err error) {
+		err = d.db.Model(&{{$.EntityPackageName}}{{$.EntityName}}{}).Where(sql, args...).First(&{{var $.EntityName}}).Error
+		return
+	}`,
+	"BatchUpdateBySql": `func (d *{{$.ModelName}}) BatchUpdateBySql(sql string, args []interface{}, updates map[string]interface{}) (err error) {
+		err = d.db.Model(&{{$.EntityPackageName}}{{$.EntityName}}{}).Where(sql, args...).Updates(updates).Error
 		return
 	}`,
 	"FetchList": `func (d *{{$.ModelName}}) FetchList(size int32, offset int32, count *int32, sql *string, args ...interface{}) ({{var $.EntityName}}List []{{$.EntityPackageName}}{{$.EntityName}}, err error) {
@@ -94,9 +113,9 @@ var templateMethodUniqMap = map[string]string{
 		var db *gorm.DB
 		if sql != nil {
 			if size == -1 {
-				db = d.db.Model(m).Where(*sql, args...).Offset(offset).Find(&{{var $.EntityName}}List)
+				db = d.db.Model(&m).Where(*sql, args...).Offset(offset).Find(&{{var $.EntityName}}List)
 			} else {
-				db = d.db.Model(m).Where(*sql, args...).Offset(offset).Limit(size).Find(&{{var $.EntityName}}List)
+				db = d.db.Model(&m).Where(*sql, args...).Offset(offset).Limit(size).Find(&{{var $.EntityName}}List)
 			}
 		} else {
 			if len(args) > 1 {
@@ -107,15 +126,15 @@ var templateMethodUniqMap = map[string]string{
 			switch t.Kind() {
 			case reflect.Struct:
 				if size == -1 {
-					db = d.db.Where(args[0]).Offset(offset).Find(&{{var $.EntityName}}List)
+					db = d.db.Model(&m).Where(args[0]).Offset(offset).Find(&{{var $.EntityName}}List)
 				} else {
-					db = d.db.Where(args[0]).Offset(offset).Limit(size).Find(&{{var $.EntityName}}List)
+					db = d.db.Model(&m).Where(args[0]).Offset(offset).Limit(size).Find(&{{var $.EntityName}}List)
 				}
 			case reflect.Map:
 				if size == -1 {
-					db = d.db.Where(args[0]).Offset(offset).Find(&{{var $.EntityName}}List)
+					db = d.db.Model(&m).Where(args[0]).Offset(offset).Find(&{{var $.EntityName}}List)
 				} else {
-					db = d.db.Where(args[0]).Offset(offset).Limit(size).Find(&{{var $.EntityName}}List)
+					db = d.db.Model(&m).Where(args[0]).Offset(offset).Limit(size).Find(&{{var $.EntityName}}List)
 				}
 			default:
 				err = fmt.Errorf("args should be map or struct when sql is nil, but give %s.", t.Kind().String())
@@ -129,7 +148,7 @@ var templateMethodUniqMap = map[string]string{
 				err = nil
 			}
 		} else if count != nil {
-			db.Count(&count)
+			db.Count(count)
 		}
 		return
 	}`,

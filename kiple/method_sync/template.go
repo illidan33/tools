@@ -1,4 +1,4 @@
-package dao_sync
+package method_sync
 
 import (
 	"errors"
@@ -13,14 +13,14 @@ import (
 	"os"
 )
 
-type KipleTemplateDaoSync struct {
+type KipleTemplatemethodsync struct {
 	InterfaceName string
 
 	gen.GenTemplate
 	gen.TemplateModel
 }
 
-func (tm *KipleTemplateDaoSync) copyField(field *dst.Field) *dst.Field {
+func (tm *KipleTemplatemethodsync) copyField(field *dst.Field) *dst.Field {
 	newField := dst.Field{
 		Names: []*dst.Ident{},
 		Type:  deepcopy.Copy(field.Type).(dst.Expr),
@@ -38,7 +38,7 @@ func (tm *KipleTemplateDaoSync) copyField(field *dst.Field) *dst.Field {
 	return &newField
 }
 
-func (tm *KipleTemplateDaoSync) copyKipleNode(ffv *dst.FuncDecl) *dst.Field {
+func (tm *KipleTemplatemethodsync) copyKipleNode(ffv *dst.FuncDecl) *dst.Field {
 	ffnew := dst.Field{}
 	ffnew.Names = []*dst.Ident{dst.NewIdent(ffv.Name.Name)}
 	newType := dst.FuncType{
@@ -68,13 +68,12 @@ func (tm *KipleTemplateDaoSync) copyKipleNode(ffv *dst.FuncDecl) *dst.Field {
 	ffnew.Type = &newType
 	return &ffnew
 }
-
-func (tm *KipleTemplateDaoSync) FindInterfaceMethods(node *dst.File) (*dst.File, error) {
-	var interfaceNode *dst.InterfaceType
+func (tm *KipleTemplatemethodsync) FindSourceInterfaceNode(node *dst.File) (interfaceNode *dst.InterfaceType, err error) {
 	for _, decl := range node.Decls {
 		if declv, ok := decl.(*dst.GenDecl); ok && declv.Tok == token.TYPE {
 			if len(declv.Specs) == 0 {
-				return node, errors.New("FindInterfaceAndFillMethods - GenDecl has no Specs")
+				err = errors.New("FindInterfaceAndFillMethods - GenDecl has no Specs")
+				return
 			}
 			if typespec, ok := declv.Specs[0].(*dst.TypeSpec); ok && typespec.Name.Name == tm.InterfaceName {
 				if interfaceNode, ok = typespec.Type.(*dst.InterfaceType); ok {
@@ -84,7 +83,15 @@ func (tm *KipleTemplateDaoSync) FindInterfaceMethods(node *dst.File) (*dst.File,
 		}
 	}
 	if interfaceNode == nil {
-		return node, fmt.Errorf("Interface %s not found", tm.InterfaceName)
+		err = fmt.Errorf("Interface %s not found", tm.InterfaceName)
+		return
+	}
+	return
+}
+
+func (tm *KipleTemplatemethodsync) FindInterfaceMethods(node *dst.File, interfaceNode *dst.InterfaceType) error {
+	if interfaceNode == nil {
+		return fmt.Errorf("Interface %s not found", tm.InterfaceName)
 	}
 
 	newList := make([]*dst.Field, 0)
@@ -111,12 +118,12 @@ func (tm *KipleTemplateDaoSync) FindInterfaceMethods(node *dst.File) (*dst.File,
 		}
 	}
 
-	interfaceNode.Methods.List = newList
+	interfaceNode.Methods.List = append(interfaceNode.Methods.List, newList...)
 
-	return node, nil
+	return nil
 }
 
-func (tm *KipleTemplateDaoSync) ParseToFile(dstFilePath string, node *dst.File) (err error) {
+func (tm *KipleTemplatemethodsync) ParseToFile(dstFilePath string, node *dst.File) (err error) {
 	fset, af, e := decorator.RestoreFile(node)
 	if e != nil {
 		err = e

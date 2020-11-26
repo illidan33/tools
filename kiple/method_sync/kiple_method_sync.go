@@ -1,9 +1,10 @@
-package dao_sync
+package method_sync
 
 import (
-	"errors"
 	"fmt"
+	"github.com/dave/dst"
 	"path/filepath"
+	"strings"
 
 	"github.com/illidan33/tools/common"
 )
@@ -14,7 +15,7 @@ type CmdKipleInterfaceCheck struct {
 	IsDebug       bool
 
 	Environments common.CmdFilePath
-	Template     KipleTemplateDaoSync
+	Template     KipleTemplatemethodsync
 }
 
 func (cmdtp *CmdKipleInterfaceCheck) String() string {
@@ -37,8 +38,8 @@ func (cmdtp *CmdKipleInterfaceCheck) Init() error {
 	if cmdtp.IsDebug {
 		fmt.Printf("%#v\n", cmdtp.Environments)
 		if cmdtp.Environments.PackageName == "main" {
-			cmdtp.Environments.CmdDir = filepath.Join(common.GetGoPath(), "/src/github.com/m2c/kiplelive-agent/service")
-			cmdtp.Environments.CmdFileName = "user_service.go"
+			cmdtp.Environments.CmdDir = filepath.Join(common.GetGoPath(), "/src/github.com/illidan33/gotest/tools_test/example/entity")
+			cmdtp.Environments.CmdFileName = "user_profiles_dao.go"
 		}
 	}
 	cmdtp.Template.InterfaceName = cmdtp.InterfaceName
@@ -49,18 +50,33 @@ func (cmdtp *CmdKipleInterfaceCheck) Init() error {
 
 func (cmdtp *CmdKipleInterfaceCheck) Parse() error {
 	excuteFilePath := filepath.Join(cmdtp.Environments.CmdDir, cmdtp.Environments.CmdFileName)
-	if !common.IsExists(excuteFilePath) {
-		return errors.New("file not exist: " + excuteFilePath)
-	}
 	dstfl, err := cmdtp.Template.GetDstTree(excuteFilePath)
 	if err != nil {
 		return err
 	}
-	dstfl, err = cmdtp.Template.FindInterfaceMethods(dstfl)
+	interfaceNode, err := cmdtp.Template.FindSourceInterfaceNode(dstfl)
+	if err != nil {
+		return err
+	}
+	interfaceNode.Methods.List = make([]*dst.Field, 0)
+
+	// file interface method
+	err = cmdtp.Template.FindInterfaceMethods(dstfl, interfaceNode)
+	if err != nil {
+		return err
+	}
+	var genDstfl *dst.File
+	end := strings.TrimSuffix(excuteFilePath, ".go")
+	genDstfl, err = cmdtp.Template.GetDstTree(end + "_generate.go")
+	if err != nil {
+		return err
+	}
+	err = cmdtp.Template.FindInterfaceMethods(genDstfl, interfaceNode)
 	if err != nil {
 		return err
 	}
 
+	// format code
 	err = cmdtp.Template.ParseToFile(excuteFilePath, dstfl)
 	if err != nil {
 		return err

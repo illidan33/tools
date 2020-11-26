@@ -2,14 +2,14 @@ package cmd
 
 import (
 	"github.com/illidan33/tools/common"
-	"github.com/illidan33/tools/kiple/dao_sync"
+	"github.com/illidan33/tools/kiple/method_sync"
 	"github.com/spf13/cobra"
 )
 
-var kipleInterfaceCheck dao_sync.CmdKipleInterfaceCheck
+var kipleInterfaceCheck method_sync.CmdKipleInterfaceCheck
 var cmdkipleInterfaceCheck = &cobra.Command{
-	Use:   "daosync",
-	Short: "sync funcs from impl to dao interface",
+	Use:   "methodsync",
+	Short: "sync funcs from impl to interface",
 	Run: func(cmd *cobra.Command, args []string) {
 		common.CmdDo(&kipleInterfaceCheck)
 	},

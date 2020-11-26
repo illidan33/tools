@@ -11,8 +11,8 @@ import (
 )
 
 type CmdKipleDao struct {
-	Entity        string
-	IsDebug       bool
+	Entity  string
+	IsDebug bool
 
 	Environments common.CmdFilePath
 	Template     KipleTemplateDao
@@ -73,14 +73,28 @@ func (cmdtp *CmdKipleDao) Parse() (err error) {
 		return
 	}
 
+	dstFilePath := filepath.Join(cmdtp.Environments.CmdDir, common.ToLowerSnakeCase(cmdtp.Template.InterfaceName)+".go")
+	if !common.IsExists(dstFilePath) {
+		var bf *bytes.Buffer
+		bf, err = cmdtp.Template.ParseTemplate(templateDaoTxt, cmdtp.Template.ModelName, cmdtp.Template)
+		if err != nil {
+			return
+		}
+
+		err = cmdtp.Template.FormatCodeToFile(dstFilePath, bf)
+		if err != nil {
+			return
+		}
+	}
+
+	genDstFilePath := filepath.Join(cmdtp.Environments.CmdDir, common.ToLowerSnakeCase(cmdtp.Template.InterfaceName)+"_generate.go")
 	var bf *bytes.Buffer
-	bf, err = cmdtp.Template.ParseTemplate(templateDaoTxt, cmdtp.Template.ModelName, cmdtp.Template)
+	bf, err = cmdtp.Template.ParseTemplate(templateDaoGenTxt, cmdtp.Template.ModelName, cmdtp.Template)
 	if err != nil {
 		return
 	}
 
-	dstFilePath := filepath.Join(cmdtp.Environments.CmdDir, common.ToLowerSnakeCase(cmdtp.Template.InterfaceName)+".go")
-	err = cmdtp.Template.FormatCodeToFile(dstFilePath, bf)
+	err = cmdtp.Template.FormatCodeToFile(genDstFilePath, bf)
 	if err != nil {
 		return
 	}

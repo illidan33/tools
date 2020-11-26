@@ -155,7 +155,7 @@ func (gt *GenTemplate) GetDstTree(filePath string) (*dst.File, error) {
 	var file *os.File
 	var err error
 	if !common.IsExists(filePath) {
-		return nil, errors.New("GetDstTree - file not exist")
+		return nil, fmt.Errorf("GetDstTree - file not exist: %s", filePath)
 	}
 	file, err = os.Open(filePath)
 	if err != nil {
@@ -168,7 +168,7 @@ func (gt *GenTemplate) GetDstTree(filePath string) (*dst.File, error) {
 		return nil, err
 	}
 	if len(codes) == 0 {
-		return nil, errors.New("GetDstTree - file empty")
+		return nil, fmt.Errorf("GetDstTree - file empty: %s", filePath)
 	}
 
 	f, err := decorator.Parse(codes)
