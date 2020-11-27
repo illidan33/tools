@@ -67,13 +67,16 @@ func (cmdtp *CmdKipleInterfaceCheck) Parse() error {
 	}
 	var genDstfl *dst.File
 	end := strings.TrimSuffix(excuteFilePath, ".go")
-	genDstfl, err = cmdtp.Template.GetDstTree(end + "_generate.go")
-	if err != nil {
-		return err
-	}
-	err = cmdtp.Template.FindInterfaceMethods(genDstfl, interfaceNode)
-	if err != nil {
-		return err
+	genFile := end + "_generate.go"
+	if common.IsExists(genFile) {
+		genDstfl, err = cmdtp.Template.GetDstTree(genFile)
+		if err != nil {
+			return err
+		}
+		err = cmdtp.Template.FindInterfaceMethods(genDstfl, interfaceNode)
+		if err != nil {
+			return err
+		}
 	}
 
 	// format code

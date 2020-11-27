@@ -57,7 +57,18 @@ func GetImportPath(path string) (string, error) {
 	return pkg.ImportPath, nil
 }
 
+func GetImportByPackage(pkg string) (string, error) {
+	p, err := build.ImportDir(filepath.Join(GetGoPath(), "src", pkg), build.FindOnly)
+	if err != nil {
+		return "", err
+	}
+	return p.Dir, nil
+}
+
 func GetImportPackageName(path string) (string, error) {
+	if strings.HasSuffix(path, ".go") {
+		path = filepath.Dir(path)
+	}
 	pkg, err := build.ImportDir(path, build.ImportComment)
 	if err != nil {
 		return "", err
