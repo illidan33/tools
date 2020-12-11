@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dave/dst"
-	"github.com/illidan33/tools/common"
+	"tools/common"
 	"path/filepath"
 	"strings"
 )
@@ -48,12 +48,12 @@ func (cmdtp *CmdKipleDao) Parse() (err error) {
 
 	pathDir := filepath.Dir(path)
 	var pathPackage string
-	pathPackage, err = common.GetImportPackageName(pathDir)
+	pathPackage, err = common.GetPackageNameFromPath(pathDir)
 	if err != nil {
 		return
 	}
 	if cmdtp.Template.PackageName != pathPackage {
-		pkgPath, err := common.GetImportPath(pathDir)
+		pkgPath, err := common.GetDirFromPackage(pathDir)
 		if err != nil {
 			return err
 		}

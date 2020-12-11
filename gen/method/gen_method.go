@@ -2,7 +2,7 @@ package method
 
 import (
 	"fmt"
-	"github.com/illidan33/tools/common"
+	"tools/common"
 	"path/filepath"
 )
 

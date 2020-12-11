@@ -3,14 +3,14 @@ package dao_create
 import (
 	"bytes"
 	"fmt"
-	"github.com/illidan33/tools/common"
+	"tools/common"
 	"regexp"
 	"text/template"
 
 	"github.com/dave/dst"
-	"github.com/illidan33/tools/gen"
-	"github.com/illidan33/tools/gen/method"
-	"github.com/illidan33/tools/gen/util/types"
+	"tools/gen"
+	"tools/gen/method"
+	"tools/gen/util/types"
 )
 
 var templateDaoTxt = `package {{$.PackageName}}

@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"github.com/illidan33/tools/common"
-	"github.com/illidan33/tools/kiple/dao_create"
+	"tools/common"
+	"tools/kiple/dao_create"
 	"github.com/spf13/cobra"
 )
 

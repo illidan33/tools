@@ -2,8 +2,8 @@ package model
 
 import (
 	"fmt"
-	"github.com/illidan33/tools/common"
-	"github.com/illidan33/tools/gen"
+	"tools/common"
+	"tools/gen"
 	"path/filepath"
 )
 

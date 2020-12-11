@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/illidan33/tools/common"
-	"github.com/illidan33/tools/gen"
-	"github.com/illidan33/tools/gen/util/types"
-	"github.com/illidan33/tools/util/httptool"
+	"tools/common"
+	"tools/gen"
+	"tools/gen/util/types"
+	"tools/util/httptool"
 	"io/ioutil"
 	"os"
 	"regexp"
@@ -45,7 +45,7 @@ func (c {{$ModelName}}){{$func.Name}}({{if $hasReq}}req {{$func.RequestModel.Mod
 		return
 	}
 	{{if $isStruct}}
-	err = c.ParseToResult(rs, &resp)
+	err = c.ParseCommonResponse(rs, &resp)
 	{{else}}
 	resp = rs
 	{{end}}

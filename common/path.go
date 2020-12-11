@@ -6,7 +6,6 @@ import (
 	"github.com/dave/kerr"
 	"go/build"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -27,10 +26,7 @@ func GetGenEnvironmentValues() (path CmdFilePath, err error) {
 		return
 	}
 	if path.PackageName == "" {
-		path.PackageName, _ = GetImportPackageName(path.CmdDir)
-		if path.PackageName == "" {
-			path.PackageName = filepath.Base(path.CmdDir)
-		}
+		path.PackageName, _ = GetPackageNameFromPath(path.CmdDir)
 	}
 	if path.Sys == "" {
 		path.Sys = runtime.GOOS
@@ -41,37 +37,35 @@ func GetGenEnvironmentValues() (path CmdFilePath, err error) {
 	return
 }
 
-func GetCurrentDirectory() (string, error) {
-	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
-	if err != nil {
-		return "", err
-	}
-	return dir, nil
-}
-
-func GetImportPath(path string) (string, error) {
+func GetBuildPackageFromDir(path string) (*build.Package, error) {
 	pkg, err := build.ImportDir(path, build.FindOnly)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return pkg.ImportPath, nil
+	return pkg, nil
 }
 
-func GetImportByPackage(pkg string) (string, error) {
-	p, err := build.ImportDir(filepath.Join(GetGoPath(), "src", pkg), build.FindOnly)
+func GetDirFromPackage(pkg string) (string, error) {
+	if pkg[0] != '/' {
+		pkg = filepath.Join(GetGoPath(), "src", pkg)
+	}
+	p, err := build.ImportDir(pkg, build.FindOnly)
 	if err != nil {
 		return "", err
 	}
 	return p.Dir, nil
 }
 
-func GetImportPackageName(path string) (string, error) {
-	if strings.HasSuffix(path, ".go") {
+func GetPackageNameFromPath(path string) (string, error) {
+	if !IsDir(path) {
 		path = filepath.Dir(path)
 	}
-	pkg, err := build.ImportDir(path, build.ImportComment)
+	pkg, err := build.ImportDir(path, build.IgnoreVendor)
 	if err != nil {
 		return "", err
+	}
+	if pkg.Name == "" {
+		return filepath.Base(path), nil
 	}
 	return pkg.Name, nil
 }
@@ -106,24 +100,25 @@ func IsDir(path string) bool {
 	return s.IsDir()
 }
 
-func GetDirFromPackage(environ []string, gopath string, packagePath string) (string, error) {
-	exe := exec.Command("go", "list", "-f", "{{.Dir}}", packagePath)
-	exe.Env = environ
-	out, err := exe.CombinedOutput()
-	if err == nil {
-		return strings.TrimSpace(string(out)), nil
-	}
+//func GetDirFromPackage(environ []string, packagePath string) (string, error) {
+//	exe := exec.Command("go", "list", "-f", "{{.Dir}}", packagePath)
+//	exe.Env = environ
+//	out, err := exe.CombinedOutput()
+//	if err == nil {
+//		return strings.TrimSpace(string(out)), nil
+//	}
+//
+//	dir, err := GetDirFromEmptyPackage(packagePath)
+//	if err != nil {
+//		return "", kerr.Wrap("GXTUPMHETV", err)
+//	}
+//	return dir, nil
+//
+//}
 
-	dir, err := GetDirFromEmptyPackage(gopath, packagePath)
-	if err != nil {
-		return "", kerr.Wrap("GXTUPMHETV", err)
-	}
-	return dir, nil
-
-}
-
-func GetDirFromEmptyPackage(gopathEnv string, path string) (string, error) {
-	gopaths := filepath.SplitList(gopathEnv)
+func GetDirFromEmptyPackage(path string) (string, error) {
+	gopath := GetGoPath()
+	gopaths := filepath.SplitList(gopath)
 	for _, gopath := range gopaths {
 		dir := filepath.Join(gopath, "src", path)
 		if s, err := os.Stat(dir); err == nil && s.IsDir() {
@@ -133,7 +128,8 @@ func GetDirFromEmptyPackage(gopathEnv string, path string) (string, error) {
 	return "", errors.New("not found")
 }
 
-func GetPackageFromDir(gopath string, dir string) (string, error) {
+func GetPackageFromDir(dir string) (string, error) {
+	gopath := GetGoPath()
 	gopaths := filepath.SplitList(gopath)
 	var savedError error
 	for _, gopath := range gopaths {
@@ -162,12 +158,13 @@ func GetPackageFromDir(gopath string, dir string) (string, error) {
 	return "", kerr.New("CXOETFPTGM", "Package not found for %s", dir)
 }
 
-func GetCurrentGopath(gopath string, currentDir string) string {
-	gopaths := filepath.SplitList(gopath)
-	for _, gopath := range gopaths {
-		if strings.HasPrefix(currentDir, gopath) {
-			return gopath
-		}
-	}
-	return gopaths[0]
-}
+//func GetPackagePathFromDir(currentDir string) string {
+//	gopath := GetGoPath()
+//	gopaths := filepath.SplitList(gopath)
+//	for _, gopath := range gopaths {
+//		if strings.HasPrefix(currentDir, gopath) {
+//			return gopath
+//		}
+//	}
+//	return gopaths[0]
+//}

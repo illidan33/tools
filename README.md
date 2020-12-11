@@ -1,6 +1,7 @@
 # tools
 
 - install
+
 ```
 git clone git@github.com:illidan33/tools.git
 
@@ -8,11 +9,13 @@ cd tools
 
 go install
 ```
+
 the cmd file 'tools' will be installed to your $GOBIN directory.
 
 ### cmd
 
 - gen model
+
 ```
 //go:generate tools gen model [option]
 
@@ -21,6 +24,7 @@ the cmd file 'tools' will be installed to your $GOBIN directory.
 ```
 
 - gen method
+
 ```
 //go:generate tools gen method [option]
 
@@ -28,6 +32,7 @@ the cmd file 'tools' will be installed to your $GOBIN directory.
 ```
 
 - gen client
+
 ```
 //go:generate tools gen client [option]
 
@@ -35,6 +40,7 @@ the cmd file 'tools' will be installed to your $GOBIN directory.
 ```
 
 - kiple daocreate
+
 ```
 //go:generate tools kiple daocreate [option]
 
@@ -42,8 +48,18 @@ the cmd file 'tools' will be installed to your $GOBIN directory.
 ```
 
 - kiple methodsync
+
 ```
 //go:generate tools kiple methodsync [option]
 
 同步model的所有funcs到interface中
 ```
+
+- kiple swag
+    - 需要在main.go文件所在目录运行命令;
+    - 入参规则：
+        - 仅body或query参数时，入参struct取名规则：{{func name}}Request;
+        - 当存在path、header参数时：{{func name}}RequestWl，并且struc中每个字段需要定义标签'in'，标识属于'body' or 'query' or 'path' or 'header';
+        - query/path/header字段可定义标签'require': true or false；
+    - 返回参数规则: {{func name}}Response;
+    - controller注册func名称必须为"RegisterGlobalModel";

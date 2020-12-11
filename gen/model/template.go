@@ -2,7 +2,7 @@ package model
 
 import (
 	"bytes"
-	"github.com/illidan33/tools/gen"
+	"tools/gen"
 	"strings"
 )
 

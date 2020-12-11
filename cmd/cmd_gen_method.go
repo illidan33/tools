@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"github.com/illidan33/tools/common"
-	"github.com/illidan33/tools/gen/method"
+	"tools/common"
+	"tools/gen/method"
 	"github.com/spf13/cobra"
 )
 

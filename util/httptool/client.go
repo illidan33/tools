@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/valyala/fasthttp"
-	"github.com/illidan33/tools/common"
+	"tools/common"
 	"reflect"
 	"strings"
 	"time"

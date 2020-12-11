@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"github.com/illidan33/tools/common"
-	"github.com/illidan33/tools/kiple/method_sync"
+	"tools/common"
+	"tools/kiple/method_sync"
 	"github.com/spf13/cobra"
 )
 

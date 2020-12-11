@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"github.com/illidan33/tools/common"
-	"github.com/illidan33/tools/kiple/swagger"
+	"tools/common"
+	"tools/kiple/swagger"
 	"github.com/spf13/cobra"
 )
 
@@ -16,8 +16,9 @@ var cmdKipleSwagger = &cobra.Command{
 }
 
 func init() {
-	cmdKipleSwagger.Flags().StringVarP(&kipleSwagger.ServideDir, "path", "p", "", "(required) the service dir path which you want to generate swagger from")
-	cmdKipleSwagger.Flags().BoolVarP(&kipleSwagger.IsDebug, "debug", "d", false, "open debug flag,default: false")
+	cmdKipleSwagger.Flags().StringVarP(&kipleSwagger.Controller, "controller", "", "./controller", "(required) the controller dir name which you want to generate swagger from")
+	cmdKipleSwagger.Flags().StringVarP(&kipleSwagger.Pojo, "pojo", "", "./pojo", "(required) the pojo dir name which you want to generate swagger from")
+	cmdKipleSwagger.Flags().BoolVarP(&kipleSwagger.IsDebug, "debug", "", false, "open debug flag")
 
 	cmdKiple.AddCommand(cmdKipleSwagger)
 }

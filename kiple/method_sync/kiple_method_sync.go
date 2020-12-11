@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/illidan33/tools/common"
+	"tools/common"
 )
 
 type CmdKipleInterfaceCheck struct {
