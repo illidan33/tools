@@ -1,10 +1,8 @@
 package swagger
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/ghodss/yaml"
 	"path/filepath"
 	"tools/common"
 	"tools/gen"
@@ -13,6 +11,7 @@ import (
 type CmdKipleSwagger struct {
 	Controller string
 	Pojo       string
+	IsInit     uint8
 	IsDebug    bool
 
 	Environments common.CmdFilePath
@@ -49,14 +48,6 @@ func (cmdtp *CmdKipleSwagger) Init() error {
 	if err != nil {
 		return err
 	}
-
-	return nil
-}
-
-func (cmdtp *CmdKipleSwagger) Parse() error {
-	if !common.IsExists(cmdtp.Environments.CmdDir) {
-		return errors.New("empty cmddir")
-	}
 	cmdtp.Template.ModelList = map[string]gen.TemplateModel{}
 	cmdtp.Template.Swagger.Swagger = "2.0"
 	cmdtp.Template.ControllerUrls = map[string]string{}
@@ -70,6 +61,15 @@ func (cmdtp *CmdKipleSwagger) Parse() error {
 	}
 	cmdtp.Template.Swagger.Paths = map[string]map[string]SwaggerPath{}
 	cmdtp.Template.Swagger.Definitions = map[string]SwaggerDefinition{}
+	cmdtp.Template.IsInit = cmdtp.IsInit
+
+	return nil
+}
+
+func (cmdtp *CmdKipleSwagger) Parse() error {
+	if !common.IsExists(cmdtp.Environments.CmdDir) {
+		return errors.New("empty cmddir")
+	}
 
 	var err error
 	err = cmdtp.Template.ParseSwagTitle(filepath.Join(cmdtp.Environments.CmdDir, cmdtp.Environments.CmdFileName))
@@ -87,39 +87,16 @@ func (cmdtp *CmdKipleSwagger) Parse() error {
 		return err
 	}
 	cmdtp.Template.SetSwaggerPaths()
-
-	content, err := json.MarshalIndent(cmdtp.Template.Swagger.SwaggerRoot, "", "  ")
-	if err != nil {
-		return err
-	}
-	yamlContent, err := yaml.JSONToYAML(content)
-	//yamlContent, err := yaml.Marshal(cmdtp.Template.Swagger.SwaggerRoot)
+	err = cmdtp.Template.OverWriteControllerDir(cmdtp.Controller)
 	if err != nil {
 		return err
 	}
 
-	err = cmdtp.Template.WriteToFile(filepath.Join(cmdtp.Environments.CmdDir, "docs/swagger.json"), content)
-	if err != nil {
-		return err
-	}
-	err = cmdtp.Template.WriteToFile(filepath.Join(cmdtp.Environments.CmdDir, "docs/swagger.yaml"), yamlContent)
-	if err != nil {
-		return err
-	}
-
-	docContent, err := json.MarshalIndent(cmdtp.Template.Swagger, "", "  ")
-	if err != nil {
-		return err
-	}
-	bt, err := cmdtp.Template.ParseTemplate(templateSwagTxt, "templateSwagTxt", map[string]string{
-		"Docs": fmt.Sprintf("`%s`", string(docContent)),
-	})
-	if err != nil {
-		return err
-	}
-	err = cmdtp.Template.FormatCodeToFile(filepath.Join(cmdtp.Environments.CmdDir, "docs/docs.go"), bt)
-	if err != nil {
-		return err
+	if cmdtp.Template.IsInit == 0 {
+		err = cmdtp.Template.FormatToFiles(cmdtp.Environments.CmdDir)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

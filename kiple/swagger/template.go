@@ -1,17 +1,18 @@
 package swagger
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/dave/dst"
 	"github.com/dave/dst/decorator"
 	"github.com/fatih/structtag"
+	"github.com/ghodss/yaml"
 	"go/format"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"tools/common"
 	"tools/gen"
@@ -44,12 +45,12 @@ type swaggerInfo struct {
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = swaggerInfo{
-	Version:     "1.0.0",
+	Version:     "{{$.Version}}",
 	Host:        "",
 	BasePath:    "",
 	Schemes:     []string{},
-	Title:       "GreenPacket kiplelive-agent API",
-	Description: "This is greenpacket kiplelive-agent service.",
+	Title:       "{{$.Title}}",
+	Description: "{{$.Description}}",
 }
 
 type s struct{}
@@ -89,6 +90,7 @@ type TemplateKipleSwagger struct {
 	ControllerUrls       map[string]string
 	TemplateSwaggerPaths []TemplateSwaggerPath
 	Swagger              SwaggerDocRoot
+	IsInit               uint8
 }
 
 type TemplateSwaggerPath struct {
@@ -98,8 +100,9 @@ type TemplateSwaggerPath struct {
 	Produces   []string
 	Tag        string
 	Summary    string
-	Parameters []map[string]interface{}
-	Responses  map[string]SwaggerPathResp
+	FuncName   string
+	Parameters []SwaggerDefinitionProperty
+	Responses  []SwaggerPathResp
 }
 
 type SwaggerRoot struct {
@@ -124,12 +127,12 @@ type SwaggerInfo struct {
 }
 
 type SwaggerPath struct {
-	Consumes   []string                   `json:"consumes" yaml:"consumes"`
-	Produces   []string                   `json:"produces" yaml:"produces"`
-	Tags       []string                   `json:"tags" yaml:"tags"`
-	Summary    string                     `json:"summary" yaml:"summary"`
-	Parameters []map[string]interface{}   `json:"parameters" yaml:"parameters"`
-	Responses  map[string]SwaggerPathResp `json:"responses" yaml:"responses"`
+	Consumes   []string                          `json:"consumes" yaml:"consumes"`
+	Produces   []string                          `json:"produces" yaml:"produces"`
+	Tags       []string                          `json:"tags" yaml:"tags"`
+	Summary    string                            `json:"summary" yaml:"summary"`
+	Parameters []map[string]interface{}          `json:"parameters" yaml:"parameters"`
+	Responses  map[string]map[string]interface{} `json:"responses" yaml:"responses"`
 }
 
 // replaced by map[string]interface{}
@@ -142,8 +145,9 @@ type SwaggerPathParam struct {
 }
 
 type SwaggerPathResp struct {
-	Description string            `json:"description" yaml:"description"`
-	Schema      map[string]string `json:"schema" yaml:"schema"`
+	ResponseCode string `json:"-" yaml:"-"`
+	Description  string `json:"description" yaml:"description"`
+	Model        gen.TemplateModel
 }
 
 type SwaggerDefinition struct {
@@ -152,10 +156,12 @@ type SwaggerDefinition struct {
 }
 
 type SwaggerDefinitionProperty struct {
-	Description string            `json:"description" yaml:"description"`
-	Type        string            `json:"type" yaml:"type"`
-	Schema      map[string]string `json:"schema" yaml:"schema"`
-	Items       map[string]string `json:"items" yaml:"items"`
+	Name        string
+	In          string
+	Required    bool
+	Description string
+	Type        string
+	Package     string
 }
 
 var SwagTypeMap = map[string]string{
@@ -186,48 +192,84 @@ func (tm *TemplateKipleSwagger) getSwagDefPropertyType(modelName, tp string) str
 	}
 }
 
-func (tm *TemplateKipleSwagger) getSwagSchema(modelPackage string, propertyType string) SwaggerDefinitionProperty {
-	tmp := SwaggerDefinitionProperty{
-		Schema: map[string]string{},
-		Items:  map[string]string{},
-	}
-	if fType, ok := SwagTypeMap[propertyType]; ok {
-		tmp.Type = fType
-		tmp.Schema = nil
-		tmp.Items = nil
-	} else if strings.HasPrefix(propertyType, "[]") {
-		tmp.Type = "array"
-		tmp.Items = map[string]string{
-			"$ref": "#/definitions/" + modelPackage + "." + strings.TrimPrefix(propertyType, "[]"),
-		}
+func (tm *TemplateKipleSwagger) getSwagDefPropertyTagType(modelName, tp string) string {
+	if fType, ok := SwagTypeMap[tp]; ok {
+		return fType
+	} else if strings.HasPrefix(tp, "[]") {
+		sourceType := strings.TrimPrefix(tp, "[]")
+		return "[]" + tm.getSwagDefPropertyTagType(modelName, sourceType)
 	} else {
-		tmp.Type = "object"
-		tmp.Schema = map[string]string{
-			"$ref": "#/definitions/" + modelPackage + "." + propertyType,
-		}
+		return modelName + "." + tp
 	}
-	return tmp
 }
 
-func (tm *TemplateKipleSwagger) getSwagSchemaMap(modelName, propertyType, comment string) map[string]interface{} {
-	sch := map[string]interface{}{
-		"description": comment,
-	}
+func (tm *TemplateKipleSwagger) getSwagSchemaMap(modelName, propertyType string) map[string]interface{} {
+	sch := map[string]interface{}{}
 	if fType, ok := SwagTypeMap[propertyType]; ok {
 		sch["type"] = fType
 	} else if strings.HasPrefix(propertyType, "[]") {
 		sourceType := strings.TrimPrefix(propertyType, "[]")
-		//sch["type"] = "array"
-		sch["items"] = map[string]string{
-			"$ref": tm.getSwagDefPropertyType(modelName, sourceType),
-		}
+		sch["type"] = "array"
+		sch["items"] = tm.getSwagSchemaMap(modelName, sourceType)
+	} else if strings.HasPrefix(propertyType, "map[") {
+		i := strings.Index(propertyType, "]")
+		sourceType := propertyType[i+1:]
+		sch["type"] = "object"
+		sch["additionalProperties"] = tm.getSwagSchemaMap(modelName, sourceType)
 	} else {
 		//sch["type"] = "object"
-		sch["schema"] = map[string]string{
-			"$ref": tm.getSwagDefPropertyType(modelName, propertyType),
+		if v, ok := tm.ModelList[propertyType]; ok {
+			swagDef := SwaggerDefinition{
+				Type:       "object",
+				Properties: map[string]interface{}{},
+			}
+			for _, field := range v.TemplateModelFields {
+				if field.JsonName == "-" {
+					continue
+				}
+				swagDef.Properties[field.JsonName] = tm.getSwagPropertity(v.Package, field.Type, field.Comment)
+			}
+			tm.Swagger.Definitions[fmt.Sprintf("%s.%s", v.Package, v.ModelName)] = swagDef
+		}
+
+		return map[string]interface{}{
+			"$ref": "#/definitions/" + modelName + "." + propertyType,
 		}
 	}
 	return sch
+}
+
+func (tm *TemplateKipleSwagger) getSwagPropertity(pkg, propertyType, comment string) map[string]interface{} {
+	pro := map[string]interface{}{}
+	if fType, ok := SwagTypeMap[propertyType]; ok {
+		pro["type"] = fType
+	} else {
+		pro["schema"] = tm.getSwagSchemaMap(pkg, propertyType)
+	}
+	pro["description"] = comment
+	return pro
+}
+
+func (tm *TemplateKipleSwagger) getSwagReqParam(param SwaggerDefinitionProperty) map[string]interface{} {
+	pro := map[string]interface{}{
+		"name":        param.Name,
+		"in":          param.In,
+		"description": param.Description,
+		"required":    param.Required,
+	}
+	if v, ok := tm.ModelList[param.Type]; ok {
+		pro["schema"] = tm.getSwagSchemaMap(v.Package, v.Type)
+	} else {
+		pro["schema"] = tm.getSwagSchemaMap(param.Package, param.Type)
+	}
+	return pro
+}
+
+func (tm *TemplateKipleSwagger) getSwagResp(resp SwaggerPathResp) map[string]interface{} {
+	pro := map[string]interface{}{}
+	pro["schema"] = tm.getSwagSchemaMap(resp.Model.Package, resp.Model.Type)
+	pro["description"] = resp.Description
+	return pro
 }
 
 func (tm *TemplateKipleSwagger) parseFuncDef(method, apiUrl, name, tag, comment string) error {
@@ -241,96 +283,84 @@ func (tm *TemplateKipleSwagger) parseFuncDef(method, apiUrl, name, tag, comment 
 		Produces:   []string{"application/json"},
 		Tag:        tag,
 		Summary:    comment,
-		Parameters: []map[string]interface{}{},
-		Responses:  map[string]SwaggerPathResp{},
+		FuncName:   name,
+		Parameters: []SwaggerDefinitionProperty{},
+		Responses:  nil,
 	}
 
 	reqModelName := name + "RequestWl"
 	isBody := false
 	var req gen.TemplateModel
-	for k, model := range tm.ModelList {
-		if strings.HasSuffix(k, reqModelName) {
-			req = model
-			break
-		}
+	if v, ok := tm.ModelList[reqModelName]; ok {
+		req = v
 	}
 	if req.ModelName == "" {
 		reqModelName = name + "Request"
-		for k, model := range tm.ModelList {
-			if strings.HasSuffix(k, reqModelName) {
-				req = model
-				isBody = true
-				break
-			}
+		if v, ok := tm.ModelList[reqModelName]; ok {
+			req = v
+			isBody = true
 		}
 	}
-	if req.ModelName == "" {
-		return errors.New(reqModelName + " has no model request.")
-	}
 
-	if !isBody || (isBody && strings.ToUpper(method) == http.MethodGet) {
-		for _, field := range req.TemplateModelFields {
-			if field.JsonName == "-" {
-				continue
-			}
-			tags, err := structtag.Parse(field.Tag)
-			if err != nil {
-				return err
-			}
-			inStr := ""
-			if !isBody {
-				in, _ := tags.Get("in")
-				if in != nil {
-					inStr = in.Name
+	if req.ModelName != "" {
+		if !isBody || (isBody && strings.ToUpper(method) == http.MethodGet) {
+			for _, field := range req.TemplateModelFields {
+				if field.JsonName == "-" {
+					continue
 				}
-			} else {
-				inStr = "query"
+				tags, err := structtag.Parse(field.Tag)
+				if err != nil {
+					return err
+				}
+				inStr := ""
+				if !isBody {
+					in, _ := tags.Get("in")
+					if in != nil {
+						inStr = in.Name
+					}
+				} else {
+					inStr = "query"
+				}
+				requiredTag, _ := tags.Get("validate")
+				required := false
+				if requiredTag != nil {
+					if strings.Contains(requiredTag.Name, "required") {
+						required = true
+					}
+				}
+				swaggerPm := SwaggerDefinitionProperty{
+					Name:        field.JsonName,
+					In:          inStr,
+					Required:    required,
+					Description: field.Comment,
+					Type:        field.Type,
+					Package:     req.Package,
+				}
+				api.Parameters = append(api.Parameters, swaggerPm)
 			}
-			requiredTag, _ := tags.Get("require")
-			requiredStr := ""
-			required := false
-			if requiredTag != nil {
-				requiredStr = requiredTag.Name
-				required, _ = strconv.ParseBool(requiredStr)
-			}
-			swaggerPm := map[string]interface{}{
-				"name":     field.JsonName,
-				"in":       inStr,
-				"required": required,
-			}
-			sch := tm.getSwagSchemaMap(req.Package, field.Type, field.Comment)
-			for k, v := range sch {
-				swaggerPm[k] = v
+		} else {
+			swaggerPm := SwaggerDefinitionProperty{
+				Name:        "data",
+				In:          "body",
+				Required:    true,
+				Description: req.ModelComment,
+				Type:        req.ModelName,
+				Package:     req.Package,
 			}
 			api.Parameters = append(api.Parameters, swaggerPm)
 		}
-	} else {
-		swaggerPm := map[string]interface{}{
-			"name":     "body",
-			"in":       "body",
-			"required": true,
-		}
-		sch := tm.getSwagSchemaMap(req.Package, req.ModelName, req.ModelComment)
-		for k, v := range sch {
-			swaggerPm[k] = v
-		}
-		api.Parameters = append(api.Parameters, swaggerPm)
 	}
 
-	api.Responses = map[string]SwaggerPathResp{
-		"200": {
-			Description: "OK",
-			Schema:      nil,
-		},
-	}
+	api.Responses = make([]SwaggerPathResp, 0)
 	respModelName := name + "Response"
 	resp, ok := tm.ModelList[respModelName]
 	if ok {
-		tmp := api.Responses["200"]
-		tmp.Schema = map[string]string{
-			"$ref": "#/definitions/" + resp.Package + "." + resp.ModelName,
+		tmpResp := SwaggerPathResp{
+			ResponseCode: "200",
+			Description:  "OK",
+			Model:        resp,
 		}
-		api.Responses["200"] = tmp
+		api.Responses = append(api.Responses, tmpResp)
 	}
 
 	tm.TemplateSwaggerPaths = append(tm.TemplateSwaggerPaths, api)
@@ -342,24 +372,15 @@ func (tm *TemplateKipleSwagger) ParsePojoDir(dir string) error {
 		return errors.New(dir + " is not exist")
 	}
 
-	mList, err := tm.ParseModelDir(dir)
+	mList, err := tm.ParseModelDir(dir, false)
 	if err != nil {
 		return err
 	}
 	for _, model := range mList {
+		if _, ok := tm.ModelList[model.ModelName]; ok {
+			return errors.New("ParsePojoDir - model name repeat.")
+		}
 		tm.ModelList[model.ModelName] = model
-
-		swagDef := SwaggerDefinition{
-			Type:       "object",
-			Properties: map[string]interface{}{},
-		}
-		for _, field := range model.TemplateModelFields {
-			if field.JsonName == "-" {
-				continue
-			}
-			swagDef.Properties[field.JsonName] = tm.getSwagSchemaMap(model.Package, field.Type, field.Comment)
-		}
-		tm.Swagger.Definitions[fmt.Sprintf("%s.%s", model.Package, model.ModelName)] = swagDef
 	}
 
 	return nil
@@ -475,10 +496,10 @@ func (tm *TemplateKipleSwagger) ParseSwagTitle(file string) error {
 			},
 		}
 		dstFile.Imports = append(dstFile.Imports, docImp)
-		err = tm.genDstFileToFile(file, dstFile)
-		if err != nil {
-			return errors.New("FormatCodeToFile - write file error: " + err.Error())
-		}
+	}
+	err = tm.genDstFileToFile(file, dstFile)
+	if err != nil {
+		return errors.New("FormatCodeToFile - write file error: " + err.Error())
 	}
 	return nil
 }
@@ -570,22 +591,169 @@ func (tm *TemplateKipleSwagger) ParseControllerDir(dir string) error {
 							tm.ControllerUrls[comp.Type.(*dst.Ident).Name] = path
 						}
 					}
+				} else if tm.IsInit != 0 && fc.Recv != nil && len(fc.Recv.List) > 0 {
+					tag := tm.ParseDstNodeType(fc.Recv.List[0].Type)
+					for _, path := range tm.TemplateSwaggerPaths {
+						if tag == path.Tag && fc.Name.Name == path.FuncName {
+							var oldDecs string
+							// 1 写入-跳过已存在；2 覆盖写入；3 全部清除；
+							if tm.IsInit == 1 {
+								oldDecs = strings.Join(fc.Decs.Start.All(), "\n")
+							} else if tm.IsInit == 2 {
+								fc.Decs.Start.Clear()
+							} else if tm.IsInit == 3 {
+								fc.Decs.Start.Clear()
+								continue
+							}
+							if !strings.Contains(oldDecs, "@Tags") {
+								fc.Decs.Start.Append("// @Tags " + tag)
+							}
+							if !strings.Contains(oldDecs, "@Summary") {
+								fc.Decs.Start.Append("// @Summary " + path.FuncName)
+							}
+							if !strings.Contains(oldDecs, "@Description") {
+								fc.Decs.Start.Append("// @Description ")
+							}
+							if !strings.Contains(oldDecs, "@Accept") {
+								fc.Decs.Start.Append("// @Accept json")
+							}
+							if !strings.Contains(oldDecs, "@Produce") {
+								fc.Decs.Start.Append("// @Produce json")
+							}
+							if !strings.Contains(oldDecs, "@Param") {
+								for _, param := range path.Parameters {
+									tp := tm.getSwagDefPropertyTagType(param.Package, param.Type)
+									fc.Decs.Start.Append(fmt.Sprintf("// @Param %s %s %s %t \"%s\"", param.Name, param.In, tp, param.Required, strings.TrimPrefix(param.Description, "//")))
+								}
+							}
+							if !strings.Contains(oldDecs, "@Success") {
+								for _, resp := range path.Responses {
+									typeMap := tm.getSwagDefPropertyTagType(resp.Model.Package, resp.Model.Type)
+									if !strings.HasPrefix(resp.Model.Type, "[]") {
+										fc.Decs.Start.Append(fmt.Sprintf("// @Success %s {object} %s", resp.ResponseCode, typeMap))
+									} else {
+										fc.Decs.Start.Append(fmt.Sprintf("// @Success %s {array} %s", resp.ResponseCode, typeMap))
+									}
+								}
+							}
+							if !strings.Contains(oldDecs, "@Router") {
+								fc.Decs.Start.Append("// @Router " + path.Url + " [" + path.Method + "]")
+							}
+							break
+						}
+					}
 				}
+			}
+
+			if tm.IsInit != 0 {
+				err = tm.genDstFileToFile(filepath.Join(dir, file.Name()), dstFile)
+				if err != nil {
+					return errors.New("FormatCodeToFile - write file error: " + err.Error())
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func (tm *TemplateKipleSwagger) OverWriteControllerDir(dir string) error {
+	if tm.IsInit == 0 {
+		return nil
+	}
+	rd, err := ioutil.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	for _, file := range rd {
+		if file.IsDir() {
+			tm.OverWriteControllerDir(file.Name())
+		} else {
+			dstFile, err := tm.GetDstTree(filepath.Join(dir, file.Name()))
+			if err != nil {
+				return err
+			}
+			for _, decl := range dstFile.Decls {
+				fc, ok := decl.(*dst.FuncDecl)
+				if !ok {
+					continue
+				}
+				if fc.Recv != nil && len(fc.Recv.List) > 0 {
+					tag := tm.ParseDstNodeType(fc.Recv.List[0].Type)
+					for _, path := range tm.TemplateSwaggerPaths {
+						if tag == path.Tag && fc.Name.Name == path.FuncName {
+							var oldDecs string
+							// 1 写入-跳过已存在；2 覆盖写入；3 全部清除；
+							if tm.IsInit == 1 {
+								oldDecs = strings.Join(fc.Decs.Start.All(), "\n")
+							} else if tm.IsInit == 2 {
+								fc.Decs.Start.Clear()
+							} else if tm.IsInit == 3 {
+								fc.Decs.Start.Clear()
+								continue
+							}
+							if !strings.Contains(oldDecs, "@Tags") {
+								fc.Decs.Start.Append("// @Tags " + tag)
+							}
+							if !strings.Contains(oldDecs, "@Summary") {
+								fc.Decs.Start.Append("// @Summary " + path.FuncName)
+							}
+							if !strings.Contains(oldDecs, "@Description") {
+								fc.Decs.Start.Append("// @Description ")
+							}
+							if !strings.Contains(oldDecs, "@Accept") {
+								fc.Decs.Start.Append("// @Accept json")
+							}
+							if !strings.Contains(oldDecs, "@Produce") {
+								fc.Decs.Start.Append("// @Produce json")
+							}
+							if !strings.Contains(oldDecs, "@Param") {
+								for _, param := range path.Parameters {
+									tp := tm.getSwagDefPropertyTagType(param.Package, param.Type)
+									if param.Description == "" {
+										param.Description = param.In
+									}
+									fc.Decs.Start.Append(fmt.Sprintf("// @Param %s %s %s %t \"%s\"", param.Name, param.In, tp, param.Required, strings.TrimPrefix(param.Description, "//")))
+								}
+							}
+							if !strings.Contains(oldDecs, "@Success") {
+								for _, resp := range path.Responses {
+									typeMap := tm.getSwagDefPropertyTagType(resp.Model.Package, resp.Model.Type)
+									if !strings.HasPrefix(resp.Model.Type, "[]") {
+										fc.Decs.Start.Append(fmt.Sprintf("// @Success %s {object} %s", resp.ResponseCode, typeMap))
+									} else {
+										fc.Decs.Start.Append(fmt.Sprintf("// @Success %s {array} %s", resp.ResponseCode, typeMap))
+									}
+								}
+							}
+							if !strings.Contains(oldDecs, "@Router") {
+								fc.Decs.Start.Append("// @Router " + path.Url + " [" + path.Method + "]")
+							}
+							break
+						}
+					}
+				}
+			}
+			err = tm.genDstFileToFile(filepath.Join(dir, file.Name()), dstFile)
+			if err != nil {
+				return errors.New("FormatCodeToFile - write file error: " + err.Error())
 			}
 		}
 	}
 	return nil
 }
 
+// Set Swagger Paths with new url
 func (tm *TemplateKipleSwagger) SetSwaggerPaths() {
-	for _, path := range tm.TemplateSwaggerPaths {
+	tm.Swagger.Paths = map[string]map[string]SwaggerPath{}
+	for k, path := range tm.TemplateSwaggerPaths {
 		api := SwaggerPath{
 			Consumes:   path.Consumes,
 			Produces:   path.Produces,
 			Tags:       []string{path.Tag},
 			Summary:    path.Summary,
-			Parameters: path.Parameters,
-			Responses:  path.Responses,
+			Parameters: []map[string]interface{}{},
+			Responses:  map[string]map[string]interface{}{},
 		}
 		newPath := path.Url
 		if p, ok := tm.ControllerUrls[path.Tag]; ok {
@@ -593,6 +761,16 @@ func (tm *TemplateKipleSwagger) SetSwaggerPaths() {
 			path.Url = strings.Trim(path.Url, "/")
 			newPath = fmt.Sprintf("/%s/%s", p, path.Url)
 		}
+		tm.TemplateSwaggerPaths[k].Url = newPath
+
+		for _, param := range path.Parameters {
+			typeMap := tm.getSwagReqParam(param)
+			api.Parameters = append(api.Parameters, typeMap)
+		}
+		for _, resp := range path.Responses {
+			api.Responses[resp.ResponseCode] = tm.getSwagResp(resp)
+		}
+
 		if p, ok := tm.Swagger.Paths[newPath]; ok {
 			p[path.Method] = api
 			tm.Swagger.Paths[newPath] = p
@@ -602,4 +780,44 @@ func (tm *TemplateKipleSwagger) SetSwaggerPaths() {
 			}
 		}
 	}
+}
+
+func (tm *TemplateKipleSwagger) FormatToFiles(cmdDir string) error {
+	content, err := json.MarshalIndent(tm.Swagger.SwaggerRoot, "", "  ")
+	if err != nil {
+		return err
+	}
+	yamlContent, err := yaml.JSONToYAML(content)
+	//yamlContent, err := yaml.Marshal(cmdtp.Template.Swagger.SwaggerRoot)
+	if err != nil {
+		return err
+	}
+
+	err = tm.WriteToFile(filepath.Join(cmdDir, "docs/swagger.json"), content)
+	if err != nil {
+		return err
+	}
+	err = tm.WriteToFile(filepath.Join(cmdDir, "docs/swagger.yaml"), yamlContent)
+	if err != nil {
+		return err
+	}
+
+	docContent, err := json.MarshalIndent(tm.Swagger, "", "  ")
+	if err != nil {
+		return err
+	}
+	bt, err := tm.ParseTemplate(templateSwagTxt, "templateSwagTxt", map[string]string{
+		"Docs":        fmt.Sprintf("`%s`", string(docContent)),
+		"Description": tm.Swagger.Info.Description,
+		"Title":       tm.Swagger.Info.Title,
+		"Version":     tm.Swagger.Info.Version,
+	})
+	if err != nil {
+		return err
+	}
+	err = tm.FormatCodeToFile(filepath.Join(cmdDir, "docs/docs.go"), bt)
+	if err != nil {
+		return err
+	}
+	return nil
 }

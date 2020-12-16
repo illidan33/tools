@@ -59,7 +59,7 @@ the cmd file 'tools' will be installed to your $GOBIN directory.
     - 需要在main.go文件所在目录运行命令;
     - 入参规则：
         - 仅body或query参数时，入参struct取名规则：{{func name}}Request;
-        - 当存在path、header参数时：{{func name}}RequestWl，并且struc中每个字段需要定义标签'in'，标识属于'body' or 'query' or 'path' or 'header';
-        - query/path/header字段可定义标签'require': true or false；
+        - 当存在path、header参数时,入参struct取名规则：{{func name}}RequestWl，并且struc中每个字段需要定义标签'in'，标识属于'body' or 'query' or 'path' or 'header';
+        - query/path/header字段可定义标签: validate:"required"；
     - 返回参数规则: {{func name}}Response;
     - controller注册func名称必须为"RegisterGlobalModel";

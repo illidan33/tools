@@ -7,8 +7,6 @@ import (
 	"github.com/dave/dst"
 	"github.com/dave/dst/decorator"
 	"github.com/fatih/structtag"
-	"tools/common"
-	utiltypes "tools/gen/util/types"
 	"go/ast"
 	"go/importer"
 	"go/parser"
@@ -20,6 +18,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"tools/common"
+	utiltypes "tools/gen/util/types"
 )
 
 type GenTemplate struct {
@@ -307,22 +307,7 @@ func (tm *TemplateModel) parseModelFieldFromDst(field *dst.Field) (templateField
 	if len(field.Decs.End) > 0 {
 		templateField.Comment = field.Decs.End[0]
 	}
-
-	switch field.Type.(type) {
-	case *dst.Ident:
-		tmp := field.Type.(*dst.Ident)
-		templateField.Type = tmp.Name
-	case *dst.ArrayType:
-		tmp := field.Type.(*dst.ArrayType)
-		templateField.Type = "[]" + tmp.Elt.(*dst.Ident).Name
-	case *dst.SelectorExpr:
-		tmp := field.Type.(*dst.SelectorExpr)
-		ExprXType, ok := tmp.X.(*dst.Ident)
-		if ok {
-			templateField.Type = ExprXType.Name
-		}
-		templateField.Type += "." + tmp.Sel.Name
-	}
+	templateField.Type = tm.ParseDstNodeType(field.Type)
 	return
 }
 
@@ -338,23 +323,25 @@ func (tm *TemplateModel) ParseDstCommentFromNode(node dst.NodeDecs) string {
 }
 
 func (tm *TemplateModel) ParseDstNodeType(tp dst.Expr) string {
-	switch tp.(type) {
+	switch tpVal := tp.(type) {
 	case *dst.Ident:
-		return tp.(*dst.Ident).Name
+		return tpVal.Name
 	case *dst.StarExpr:
-		return tm.ParseDstNodeType(tp.(*dst.StarExpr).X)
+		return tm.ParseDstNodeType(tpVal.X)
 	case *dst.ArrayType:
-		return tm.ParseDstNodeType(tp.(*dst.ArrayType).Elt)
+		return "[]" + tm.ParseDstNodeType(tpVal.Elt)
 	case *dst.SliceExpr:
-		return tp.(*dst.SliceExpr).X.(*dst.Ident).Name
+		return "[]" + tm.ParseDstNodeType(tpVal.X)
 	case *dst.SelectorExpr:
 		name := ""
-		selec := tp.(*dst.SelectorExpr)
-		if selec.X != nil {
-			name = selec.X.(*dst.Ident).Name
+		if tpVal.X != nil {
+			name = tpVal.X.(*dst.Ident).Name
 		}
-		return name + selec.Sel.Name
-		// TODO(illidan/2020/11/30):
+		return name + "." + tpVal.Sel.Name
+	case *dst.MapType:
+		return fmt.Sprintf("map[%s]%s", tm.ParseDstNodeType(tpVal.Key), tm.ParseDstNodeType(tpVal.Value))
+	default:
+		// TODO(illidan/2020/11/30): other types
 	}
 	return ""
 }
@@ -436,7 +423,7 @@ func (tm *TemplateModel) ParseFuncDstTree(file *dst.File) (funcList []TemplateGe
 	return
 }
 
-func (tm *TemplateModel) ParseModelDstTree(file *dst.File) (modelList map[string]TemplateModel, err error) {
+func (tm *TemplateModel) ParseModelDstTree(file *dst.File, parseFuncs bool) (modelList map[string]TemplateModel, err error) {
 	modelList = map[string]TemplateModel{}
 	for _, decl := range file.Decls {
 		gd, ok := decl.(*dst.GenDecl)
@@ -457,52 +444,67 @@ func (tm *TemplateModel) ParseModelDstTree(file *dst.File) (modelList map[string
 		model.Package = file.Name.Name
 
 		fieldMap := map[string]TemplateModelField{}
-		st, ok := tf.Type.(*dst.StructType)
-		if !ok {
-			continue
-		}
-
-		for _, field := range st.Fields.List {
-			templateField, e := tm.parseModelFieldFromDst(field)
-			if e != nil {
-				err = e
-				return
+		switch tfTyp := tf.Type.(type) {
+		case *dst.StructType:
+			for _, field := range tfTyp.Fields.List {
+				templateField, e := tm.parseModelFieldFromDst(field)
+				if e != nil {
+					err = e
+					return
+				}
+				fieldMap[templateField.Name] = templateField
+				model.TemplateModelFields = append(model.TemplateModelFields, templateField)
 			}
-			fieldMap[templateField.Name] = templateField
-			model.TemplateModelFields = append(model.TemplateModelFields, templateField)
+			model.Type = model.ModelName
+		default:
+			model.Type = tm.ParseDstNodeType(tf.Type)
 		}
 
 		// comment def of struct
 		if gd.Decs.NodeDecs.Start != nil {
-			model.ModelComment = strings.Join(gd.Decs.NodeDecs.Start.All(), ",")
+			model.ModelComment = strings.Join(gd.Decs.NodeDecs.Start.All(), "\n")
 		}
 
-		modelList[model.ModelName] = model
+		modelList[model.Package+"."+model.ModelName] = model
 	}
-	for _, decl := range file.Decls {
-		if ffv, ok := decl.(*dst.FuncDecl); ok {
-			fc := TemplateGenModelFunc{
-				Name:           ffv.Name.Name,
-				Comment:        "",
-				BelongToStruct: nil,
-				Package:        "",
-				Args:           nil,
-				Returns:        nil,
-			}
-			if ffv.Recv == nil || len(ffv.Recv.List) == 0 {
-				continue
-			}
-			belongModelName := tm.ParseDstNodeType(ffv.Recv.List[0].Type)
+	if parseFuncs {
+		for _, decl := range file.Decls {
+			if ffv, ok := decl.(*dst.FuncDecl); ok {
+				fc := TemplateGenModelFunc{
+					Name:           ffv.Name.Name,
+					Comment:        "",
+					BelongToStruct: nil,
+					Package:        "",
+					Args:           nil,
+					Returns:        nil,
+				}
+				if ffv.Recv == nil || len(ffv.Recv.List) == 0 {
+					continue
+				}
+				belongModelName := tm.ParseDstNodeType(ffv.Recv.List[0].Type)
 
-			if ffv.Type.Params.List != nil && len(ffv.Type.Params.List) > 0 {
-				for _, field := range ffv.Type.Params.List {
-					if len(field.Names) > 0 {
-						for _, name := range field.Names {
+				if ffv.Type.Params.List != nil && len(ffv.Type.Params.List) > 0 {
+					for _, field := range ffv.Type.Params.List {
+						if len(field.Names) > 0 {
+							for _, name := range field.Names {
+								templateField := TemplateModelField{
+									Name:     name.Name,
+									GormName: "",
+									JsonName: "",
+									Type:     "",
+									Default:  "",
+									Tag:      "",
+									Comment:  "",
+								}
+								templateField.Type = tm.ParseDstNodeType(field.Type)
+								fc.Args = append(fc.Args, &templateField)
+							}
+						} else {
 							templateField := TemplateModelField{
-								Name:     name.Name,
+								Name:     "",
 								GormName: "",
 								JsonName: "",
-								Type:     "",
+								Type:     field.Type.(*dst.Ident).Name,
 								Default:  "",
 								Tag:      "",
 								Comment:  "",
@@ -510,30 +512,30 @@ func (tm *TemplateModel) ParseModelDstTree(file *dst.File) (modelList map[string
 							templateField.Type = tm.ParseDstNodeType(field.Type)
 							fc.Args = append(fc.Args, &templateField)
 						}
-					} else {
-						templateField := TemplateModelField{
-							Name:     "",
-							GormName: "",
-							JsonName: "",
-							Type:     field.Type.(*dst.Ident).Name,
-							Default:  "",
-							Tag:      "",
-							Comment:  "",
-						}
-						templateField.Type = tm.ParseDstNodeType(field.Type)
-						fc.Args = append(fc.Args, &templateField)
 					}
 				}
-			}
-			if ffv.Type.Results != nil && ffv.Type.Results.List != nil && len(ffv.Type.Results.List) > 0 {
-				for _, field := range ffv.Type.Results.List {
-					if len(field.Names) > 0 {
-						for _, name := range field.Names {
+				if ffv.Type.Results != nil && ffv.Type.Results.List != nil && len(ffv.Type.Results.List) > 0 {
+					for _, field := range ffv.Type.Results.List {
+						if len(field.Names) > 0 {
+							for _, name := range field.Names {
+								templateField := TemplateModelField{
+									Name:     name.Name,
+									GormName: "",
+									JsonName: "",
+									Type:     "",
+									Default:  "",
+									Tag:      "",
+									Comment:  "",
+								}
+								templateField.Type = tm.ParseDstNodeType(field.Type)
+								fc.Args = append(fc.Args, &templateField)
+							}
+						} else {
 							templateField := TemplateModelField{
-								Name:     name.Name,
+								Name:     "",
 								GormName: "",
 								JsonName: "",
-								Type:     "",
+								Type:     field.Type.(*dst.Ident).Name,
 								Default:  "",
 								Tag:      "",
 								Comment:  "",
@@ -541,51 +543,36 @@ func (tm *TemplateModel) ParseModelDstTree(file *dst.File) (modelList map[string
 							templateField.Type = tm.ParseDstNodeType(field.Type)
 							fc.Args = append(fc.Args, &templateField)
 						}
-					} else {
-						templateField := TemplateModelField{
-							Name:     "",
-							GormName: "",
-							JsonName: "",
-							Type:     field.Type.(*dst.Ident).Name,
-							Default:  "",
-							Tag:      "",
-							Comment:  "",
-						}
-						templateField.Type = tm.ParseDstNodeType(field.Type)
-						fc.Args = append(fc.Args, &templateField)
 					}
 				}
-			}
 
-			if tmp, ok := modelList[belongModelName]; ok {
-				tmp.TemplateModelFuncs = append(tmp.TemplateModelFuncs, fc)
-				modelList[belongModelName] = tmp
-			} else {
-				err = errors.New(belongModelName + " func is not exist")
-				return
+				if tmp, ok := modelList[belongModelName]; ok {
+					tmp.TemplateModelFuncs = append(tmp.TemplateModelFuncs, fc)
+					modelList[belongModelName] = tmp
+				}
 			}
 		}
 	}
 	return
 }
 
-func (tm *TemplateModel) GetModelsAndPackages(filepath string) (modelList map[string]TemplateModel, err error) {
-	pkg, e := common.GetPackageNameFromPath(filepath)
-	if e != nil {
-		err = e
-		return
-	}
-	tm.Package = pkg
+func (tm *TemplateModel) ParseModelsFromFile(filepath string, parseFunc bool) (modelList map[string]TemplateModel, err error) {
+	//pkg, e := common.GetPackageNameFromPath(filepath)
+	//if e != nil {
+	//	err = e
+	//	return
+	//}
+	//tm.Package = pkg
 	var dstFile *dst.File
 	dstFile, err = DefaultGenTemplate.GetDstTree(filepath)
 	if err != nil {
 		return
 	}
-	modelList, err = tm.ParseModelDstTree(dstFile)
+	modelList, err = tm.ParseModelDstTree(dstFile, parseFunc)
 	return
 }
 
-func (tm *TemplateModel) ParseModelDir(dirPath string) (modelList map[string]TemplateModel, err error) {
+func (tm *TemplateModel) ParseModelDir(dirPath string, parseFunc bool) (modelList map[string]TemplateModel, err error) {
 	var files []os.FileInfo
 	modelList = map[string]TemplateModel{}
 	files, err = ioutil.ReadDir(dirPath)
@@ -594,7 +581,7 @@ func (tm *TemplateModel) ParseModelDir(dirPath string) (modelList map[string]Tem
 	}
 	for _, file := range files {
 		if file.IsDir() {
-			mList, e := tm.ParseModelDir(filepath.Join(dirPath, file.Name()))
+			mList, e := tm.ParseModelDir(filepath.Join(dirPath, file.Name()), parseFunc)
 			if e != nil {
 				err = e
 				return
@@ -603,7 +590,7 @@ func (tm *TemplateModel) ParseModelDir(dirPath string) (modelList map[string]Tem
 				modelList[k] = model
 			}
 		} else if filepath.Ext(file.Name()) == ".go" {
-			mList, e := tm.GetModelsAndPackages(filepath.Join(dirPath, file.Name()))
+			mList, e := tm.ParseModelsFromFile(filepath.Join(dirPath, file.Name()), parseFunc)
 			if e != nil {
 				err = e
 				return
