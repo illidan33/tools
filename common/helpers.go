@@ -137,3 +137,12 @@ func GetDataBetweenFlag(source string, flag1 string, flag2 string) string {
 	}
 	return source[s+1 : e]
 }
+
+func GetFirstWordFromCamel(s string) string {
+	for i := 1; i < len(s); i++ {
+		if IsUpperLetter(rune(s[i])) {
+			return s[:i]
+		}
+	}
+	return s
+}

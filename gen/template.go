@@ -204,11 +204,12 @@ func (gt *GenTemplate) GetDstTree(filePath string) (*dst.File, error) {
 
 func (gt *GenTemplate) GetTypesPackage(filePath string) (*types.Package, error) {
 	if filepath.IsAbs(filePath) {
-		var err error
-		filePath, err = common.GetPackageFromDir(filePath)
+		//var err error
+		filePat, err := common.GetBuildPackageFromDir(filePath)
 		if err != nil {
 			return nil, err
 		}
+		filePath = filePat.ImportPath
 	}
 	pkg, err := importer.For("source", nil).Import(filePath)
 	if err != nil {
@@ -311,13 +312,31 @@ func (tm *TemplateModel) parseModelFieldFromDst(field *dst.Field) (templateField
 	return
 }
 
-func (tm *TemplateModel) ParseDstCommentFromNode(node dst.NodeDecs) string {
+func (tm *TemplateModel) getCommentByFilterTag(arr []string) string {
+	buf := bytes.Buffer{}
+	for _, s := range arr {
+		if !strings.HasPrefix(s, "// @") && !strings.HasPrefix(s, "//@") {
+			buf.WriteString(s)
+		}
+	}
+	return buf.String()
+}
+
+func (tm *TemplateModel) ParseDstCommentFromNode(node dst.NodeDecs, isFilterTag bool) string {
 	comment := make([]string, 0)
 	if node.Start != nil {
-		comment = node.Start.All()
+		if !isFilterTag {
+			comment = append(comment, node.Start.All()...)
+		} else {
+			comment = append(comment, tm.getCommentByFilterTag(node.Start.All()))
+		}
 	}
 	if node.End != nil {
-		comment = append(comment, node.End.All()...)
+		if !isFilterTag {
+			comment = append(comment, node.End.All()...)
+		} else {
+			comment = append(comment, tm.getCommentByFilterTag(node.End.All()))
+		}
 	}
 	return strings.Join(comment, ",")
 }

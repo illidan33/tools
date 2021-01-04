@@ -63,3 +63,4 @@ the cmd file 'tools' will be installed to your $GOBIN directory.
         - query/path/header字段可定义标签: validate:"required"；
     - 返回参数规则: {{func name}}Response;
     - controller注册func名称必须为"RegisterGlobalModel";
+    - BeforeActivation必须放置每个文件开头；

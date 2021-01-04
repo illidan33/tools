@@ -15,10 +15,6 @@ type CmdHandle interface {
 	String() string
 }
 
-func Generate(cmd CmdGen) {
-	cmd.CmdHandle()
-}
-
 func CmdDo(cmd CmdHandle) {
 	var err error
 	if err = cmd.Init(); err != nil {

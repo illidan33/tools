@@ -50,14 +50,17 @@ func (cmdtp *CmdKipleSwagger) Init() error {
 	}
 	cmdtp.Template.ModelList = map[string]gen.TemplateModel{}
 	cmdtp.Template.Swagger.Swagger = "2.0"
-	cmdtp.Template.ControllerUrls = map[string]string{}
-	cmdtp.Template.TemplateSwaggerPaths = []TemplateSwaggerPath{}
+	cmdtp.Template.TemplateIris = TemplateIris{
+		Parties:      map[string]*TemplateIrisParty{},
+		Applications: map[string]*TemplateIrisApplication{},
+		Controllers:  map[string]TemplateIrisController{},
+		Funcs:        map[string]TemplateIrisFunc{},
+	}
 	cmdtp.Template.Swagger.Schemes = "{{ marshal .Schemes }}"
 	cmdtp.Template.Swagger.Host = "{{.Host}}"
 	cmdtp.Template.Swagger.BasePath = "{{.BasePath}}"
 	cmdtp.Template.Swagger.Info = SwaggerInfo{
-		Contact: struct {
-		}{},
+		Contact: map[string]string{},
 	}
 	cmdtp.Template.Swagger.Paths = map[string]map[string]SwaggerPath{}
 	cmdtp.Template.Swagger.Definitions = map[string]SwaggerDefinition{}
@@ -72,6 +75,27 @@ func (cmdtp *CmdKipleSwagger) Parse() error {
 	}
 
 	var err error
+	//ldr := loader.Config{
+	//	AllowErrors: true,
+	//	ParserMode:  parser.ParseComments,
+	//}
+	//
+	//pkg, err := build.ImportDir(cmdtp.Environments.CmdDir+"/controller", build.FindOnly)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//ldr.Import(pkg.ImportPath)
+	//
+	//p, err := ldr.Load()
+	//if err != nil {
+	//	panic(err)
+	//}
+	////pkg, err := cmdtp.Template.GetTypesPackage(cmdtp.Environments.CmdDir + "/controller")
+	////if err != nil {
+	////	return err
+	////}
+	//fmt.Println(p.AllPackages)
+
 	err = cmdtp.Template.ParseSwagTitle(filepath.Join(cmdtp.Environments.CmdDir, cmdtp.Environments.CmdFileName))
 	if err != nil {
 		return err
@@ -86,7 +110,10 @@ func (cmdtp *CmdKipleSwagger) Parse() error {
 	if err != nil {
 		return err
 	}
-	cmdtp.Template.SetSwaggerPaths()
+	err = cmdtp.Template.SetSwaggerPaths()
+	if err != nil {
+		return err
+	}
 	err = cmdtp.Template.OverWriteControllerDir(cmdtp.Controller)
 	if err != nil {
 		return err
