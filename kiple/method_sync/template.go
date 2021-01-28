@@ -6,18 +6,18 @@ import (
 	"github.com/dave/dst"
 	"github.com/dave/dst/decorator"
 	"tools/common"
-	"tools/gen"
 	"github.com/mohae/deepcopy"
 	"go/format"
 	"go/token"
 	"os"
+	"tools/template"
 )
 
 type KipleTemplatemethodsync struct {
 	InterfaceName string
 
-	gen.GenTemplate
-	gen.TemplateModel
+	template.GenTemplate
+	template.TemplateModel
 }
 
 func (tm *KipleTemplatemethodsync) copyField(field *dst.Field) *dst.Field {

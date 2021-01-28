@@ -1,18 +1,18 @@
-package gen
+package template
 
 import (
 	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
-	"tools/common"
-	"tools/gen/util/types"
 	"io"
 	"io/ioutil"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
+	"tools/common"
+	"tools/gen/util/types"
 )
 
 type GormTable struct {
@@ -68,8 +68,9 @@ var FieldType = map[string]string{
 	"TINYINT":    "int8",
 	"MEDIUMINT":  "int64",
 	"BIGINT":     "int64",
-	"bool":       "int8",
-	"boolean":    "int8",
+	"BOOL":       "int8",
+	"BOOLEAN":    "int8",
+	"BIT":        "types.BitBool",
 	"CHAR":       "string",
 	"VARCHAR":    "string",
 	"BINARY":     "string",
@@ -341,7 +342,7 @@ func (gt *GormTable) parseLineField(s string, sort int) error {
 			case types.SQLCONTENTTYPE__NULL:
 				gormField.IsNull = types.GORM_FIELD_TYPE__NULL
 			case types.SQLCONTENTTYPE__DEFAULT:
-				gormField.Default = strings.Trim(lineStrs[i+1], "'")
+				gormField.Default = lineStrs[i+1]
 				i++
 			case types.SQLCONTENTTYPE__COMMENT:
 				gormField.Comment = strings.Trim(strings.Trim(lineStrs[i+1], "'"), ",")
@@ -565,7 +566,11 @@ func (gt *GormTableList) Parse(path string, gormFlags GormFlags) ([]TemplateMode
 	tms := make([]TemplateModel, 0)
 	for _, gorm := range gormList {
 		tm := TemplateModel{}
-		gorm.transformGormToModel(&tm, gormFlags)
+		err = gorm.transformGormToModel(&tm, gormFlags)
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
 		tms = append(tms, tm)
 	}
 

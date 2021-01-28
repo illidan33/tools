@@ -2,9 +2,9 @@ package model
 
 import (
 	"fmt"
-	"tools/common"
-	"tools/gen"
 	"path/filepath"
+	"tools/common"
+	"tools/template"
 )
 
 type CmdGenModel struct {
@@ -17,7 +17,7 @@ type CmdGenModel struct {
 
 	Environments common.CmdFilePath
 	NameString   string
-	Template     gen.GormTableList
+	Template     template.GormTableList
 }
 
 func (cmdtp *CmdGenModel) String() string {
@@ -36,7 +36,8 @@ func (cmdtp *CmdGenModel) Init() error {
 		fmt.Printf("%#v\n", cmdtp.Environments)
 		if cmdtp.Environments.PackageName == "main" {
 			cmdtp.Environments.PackageName = "model_test"
-			cmdtp.Environments.CmdDir = filepath.Join(common.GetGoPath(), "/src/github.com/illidan33/gotest/tools_test/example/model")
+			cmdtp.Environments.CmdDir = filepath.Join(common.GetGoPath(), "/src/github.com/illidan33/tools/example/model")
+			cmdtp.Environments.CmdFileName = "gen.go"
 		}
 	}
 
@@ -46,7 +47,7 @@ func (cmdtp *CmdGenModel) Parse() error {
 	var err error
 
 	// parse sql
-	gormFlags := gen.GormFlags{
+	gormFlags := template.GormFlags{
 		HasGorm:      cmdtp.WithGormTag,
 		IsSimpleGorm: cmdtp.WithSimpleGormTag,
 		HasJson:      cmdtp.WithJsonTag,
@@ -65,8 +66,8 @@ func (cmdtp *CmdGenModel) Parse() error {
 
 	for _, tpmData := range rs {
 		cmdtpTmp := TemplateDataModel{
-			GenTemplate: gen.GenTemplate{},
-			TemplatePackage: gen.TemplatePackage{
+			GenTemplate: template.GenTemplate{},
+			TemplatePackage: template.TemplatePackage{
 				PackageName: cmdtp.Environments.PackageName,
 				PackageList: map[string]string{},
 			},

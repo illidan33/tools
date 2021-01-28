@@ -2,14 +2,16 @@ package model
 
 import (
 	"bytes"
-	"tools/gen"
 	"strings"
+	"tools/template"
 )
 
 const templateModelTxt = `package {{ .PackageName }}
 
 import (
-	{{ range $value := .PackageList }} "{{ $value }}" {{end}}
+	{{ range $value := .PackageList }} 
+	"{{ $value }}"
+	{{end}}
 )
 {{$filename := var .ModelName}}
 
@@ -21,20 +23,22 @@ type {{ type .ModelName }} struct{
 }`
 
 type TemplateDataModel struct {
-	gen.GenTemplate
-	gen.TemplatePackage
-	gen.TemplateModel
+	template.GenTemplate
+	template.TemplatePackage
+	template.TemplateModel
 }
 
 func (tp *TemplateDataModel) Parse() (*bytes.Buffer, error) {
 	for _, field := range tp.TemplateModelFields {
 		if strings.Contains(field.Type, "time") {
 			tp.AddPackage("time", "time")
+		} else if strings.Contains(field.Type, "BitBool") {
+			tp.AddPackage("bool", "github.com/m2c/kiplestar/kipledb/types")
 		}
 	}
 
-	codeData, err := gen.DefaultGenTemplate.ParseTemplate(templateModelTxt, tp.ModelName, tp, map[string]interface{}{
-		"hasComment": func(field gen.TemplateModelField) bool {
+	codeData, err := template.DefaultGenTemplate.ParseTemplate(templateModelTxt, tp.ModelName, tp, map[string]interface{}{
+		"hasComment": func(field template.TemplateModelField) bool {
 			if field.Comment != "" {
 				return true
 			}

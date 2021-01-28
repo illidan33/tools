@@ -3,12 +3,12 @@ package dao_create
 import (
 	"bytes"
 	"fmt"
-	"tools/common"
 	"regexp"
-	"text/template"
+	ttempl "text/template"
+	"tools/template"
+	"tools/common"
 
 	"github.com/dave/dst"
-	"tools/gen"
 	"tools/gen/method"
 	"tools/gen/util/types"
 )
@@ -181,10 +181,10 @@ type CmdKipleDaoFunc struct {
 type CmdKipleDaoIndex struct {
 	Name   string
 	Type   types.IndexType
-	Fields []gen.TemplateModelField
+	Fields []template.TemplateModelField
 }
 
-func (tgm *KipleTemplateDao) joinConditionFields(fields []gen.TemplateModelField) string {
+func (tgm *KipleTemplateDao) joinConditionFields(fields []template.TemplateModelField) string {
 	rs := ""
 	for i, arg := range fields {
 		if i == 0 {
@@ -234,7 +234,7 @@ func (tm *KipleTemplateDao) ParseKipleDstTree(file *dst.File) error {
 	return nil
 }
 
-func (tgm *KipleTemplateDao) parseMethodFuncsToTemplate(tp *template.Template, td CmdKipleDaoFunc, templateTxt string, templateName string) (err error) {
+func (tgm *KipleTemplateDao) parseMethodFuncsToTemplate(tp *ttempl.Template, td CmdKipleDaoFunc, templateTxt string, templateName string) (err error) {
 	td.FuncName = fmt.Sprintf(templateName, td.FuncName)
 	templateSource := &bytes.Buffer{}
 	tp, err = tp.Parse(templateTxt)
@@ -267,7 +267,7 @@ func (tgm *KipleTemplateDao) ParseIndexToMethod(templateMethodMap, templateMetho
 	if len(tgm.TemplateMapFuncs) == 0 {
 		tgm.InitTemplateFuncs()
 	}
-	tp := template.New("kiple method")
+	tp := ttempl.New("kiple method")
 	tp.Funcs(tgm.TemplateMapFuncs)
 	for _, index := range tgm.TemplateDataMethodIndexs {
 		// TODO(illidan/2020/9/28): foreign index not include

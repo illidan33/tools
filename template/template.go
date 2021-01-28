@@ -1,4 +1,4 @@
-package gen
+package template
 
 import (
 	"bytes"
@@ -36,7 +36,7 @@ type TemplateModelField struct {
 	Comment  string
 }
 
-type TemplateGenModelFunc struct {
+type TemplateGenFunc struct {
 	Name           string
 	Comment        string
 	BelongToStruct *TemplateModel
@@ -225,7 +225,7 @@ type TemplateModel struct {
 	Package             string
 	Type                string
 	TemplateModelFields []TemplateModelField
-	TemplateModelFuncs  []TemplateGenModelFunc
+	TemplateModelFuncs  []TemplateGenFunc
 }
 
 func (tm *TemplateModel) parseTagToTokens(s string) (rs []string, e error) {
@@ -419,10 +419,10 @@ func (tm *TemplateModel) ParseDstTree(file *dst.File) (modelList []TemplateModel
 	return
 }
 
-func (tm *TemplateModel) ParseFuncDstTree(file *dst.File) (funcList []TemplateGenModelFunc, err error) {
+func (tm *TemplateModel) ParseFuncDstTree(file *dst.File) (funcList []TemplateGenFunc, err error) {
 	for _, decl := range file.Decls {
 		if ffv, ok := decl.(*dst.FuncDecl); ok {
-			fc := TemplateGenModelFunc{
+			fc := TemplateGenFunc{
 				Name:           "",
 				Comment:        "",
 				BelongToStruct: nil,
@@ -489,7 +489,7 @@ func (tm *TemplateModel) ParseModelDstTree(file *dst.File, parseFuncs bool) (mod
 	if parseFuncs {
 		for _, decl := range file.Decls {
 			if ffv, ok := decl.(*dst.FuncDecl); ok {
-				fc := TemplateGenModelFunc{
+				fc := TemplateGenFunc{
 					Name:           ffv.Name.Name,
 					Comment:        "",
 					BelongToStruct: nil,

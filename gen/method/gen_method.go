@@ -30,7 +30,7 @@ func (cmdtp *CmdGenMethod) Init() error {
 		fmt.Printf("%#v\n", cmdtp.Environments)
 		if cmdtp.Environments.PackageName == "main" {
 			cmdtp.Environments.PackageName = "model_test"
-			cmdtp.Environments.CmdDir = filepath.Join(common.GetGoPath(), "/src/github.com/illidan33/gotest/tools_test/example/model")
+			cmdtp.Environments.CmdDir = filepath.Join(common.GetGoPath(), "/src/github.com/illidan33/tools/example/model")
 		}
 	}
 	if cmdtp.Environments.CmdFileName == "" {
@@ -68,11 +68,11 @@ func (cmdtp *CmdGenMethod) Parse() error {
 	if err = cmdtp.Template.ParseDstTree(dstTree); err != nil {
 		return err
 	}
-	if err = cmdtp.Template.ParseIndexToMethod(templateMethodMap, templateMethodFieldUniqMap, templateMethodUniqMap); err != nil {
+	if err = cmdtp.Template.ParseIndexToMethod(templateIndexMap, templateIndexUniqMap, templateBaseMap); err != nil {
 		return err
 	}
 
-	bf, err := cmdtp.Template.ParseTemplate(templateMethodTxt, cmdtp.ModelName, cmdtp.Template)
+	bf, err := cmdtp.Template.ParseTemplate(templateTxt, cmdtp.ModelName, cmdtp.Template)
 	if err != nil {
 		return err
 	}
