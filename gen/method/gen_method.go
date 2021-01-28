@@ -76,9 +76,6 @@ func (cmdtp *CmdGenMethod) Parse() error {
 	if err != nil {
 		return err
 	}
-	if cmdtp.IsDebug {
-		fmt.Printf(bf.String())
-	}
 
 	dstFilePath := filepath.Join(cmdtp.Environments.CmdDir, common.ToLowerSnakeCase(cmdtp.ModelName)+"_generate.go")
 	err = cmdtp.Template.FormatCodeToFile(dstFilePath, bf)

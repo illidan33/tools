@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"tools/common"
-	"tools/kiple/method_sync"
+	"tools/gen/method_sync"
 	"github.com/spf13/cobra"
 )
 
@@ -20,5 +20,5 @@ func init() {
 	cmdkipleInterfaceCheck.Flags().StringVarP(&kipleInterfaceCheck.ModelName, "moduleName", "m", "", "(required) the module name which you want to generate from")
 	cmdkipleInterfaceCheck.Flags().BoolVarP(&kipleInterfaceCheck.IsDebug, "debug", "d", false, "open debug flag,default: false")
 
-	cmdKiple.AddCommand(cmdkipleInterfaceCheck)
+	cmdGen.AddCommand(cmdkipleInterfaceCheck)
 }

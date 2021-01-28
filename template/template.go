@@ -19,7 +19,7 @@ import (
 	"path/filepath"
 	"strings"
 	"tools/common"
-	utiltypes "tools/gen/util/types"
+	ttypes "tools/template/types"
 )
 
 type GenTemplate struct {
@@ -294,9 +294,9 @@ func (tm *TemplateModel) parseModelFieldFromDst(field *dst.Field) (templateField
 		}
 		for _, tag := range tags.Tags() {
 			switch tag.Key {
-			case utiltypes.MODEL_TAG_TYPE__JSON:
+			case ttypes.MODEL_TAG_TYPE__JSON:
 				templateField.JsonName = tag.Name
-			case utiltypes.MODEL_TAG_TYPE__GORM:
+			case ttypes.MODEL_TAG_TYPE__GORM:
 				templateField.GormName = tag.Name
 			}
 		}

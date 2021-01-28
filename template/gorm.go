@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"tools/common"
-	"tools/gen/util/types"
+	"tools/template/types"
 )
 
 type GormTable struct {

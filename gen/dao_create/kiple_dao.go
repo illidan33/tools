@@ -31,7 +31,7 @@ func (cmdtp *CmdKipleDao) Init() (err error) {
 		fmt.Printf("environment: %#v\n", cmdtp.Environments)
 		if cmdtp.Environments.PackageName == "main" {
 			cmdtp.Environments.PackageName = "entity"
-			cmdtp.Environments.CmdDir = filepath.Join(common.GetGoPath(), "/src/github.com/illidan33/gotest/tools_test/example/entity")
+			cmdtp.Environments.CmdDir = filepath.Join(common.GetGoPath(), "/src/github.com/illidan33/tools/example/entity")
 		}
 	}
 	cmdtp.Template.PackageName = cmdtp.Environments.PackageName

@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"regexp"
 	ttempl "text/template"
-	"tools/template"
 	"tools/common"
+	"tools/template"
 
 	"github.com/dave/dst"
 	"tools/gen/method"
-	"tools/gen/util/types"
+	"tools/template/types"
 )
 
 var templateDaoTxt = `package {{$.PackageName}}
@@ -41,9 +41,7 @@ type {{$.ModelName}} struct {
 }
 
 `
-var templateDaoGenTxt = `// Code generate by 'tools kiple daocreate', Do not edit!
-
-package {{$.PackageName}}
+var templateDaoGenTxt = `package {{$.PackageName}}
 
 import (
 	"fmt"

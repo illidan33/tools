@@ -8,8 +8,8 @@ import (
 	"strings"
 	ttempl "text/template"
 	"tools/common"
-	"tools/gen/util/types"
 	"tools/template"
+	"tools/template/types"
 
 	"github.com/dave/dst"
 )

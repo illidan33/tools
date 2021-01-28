@@ -3,7 +3,7 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 	"tools/common"
-	"tools/kiple/swagger"
+	"tools/gen/swagger"
 )
 
 var kipleSwagger swagger.CmdKipleSwagger
@@ -21,5 +21,5 @@ func init() {
 	cmdKipleSwagger.Flags().Uint8VarP(&kipleSwagger.IsInit, "init", "", 0, "only generate swagger tag into file or into dir 'docs'.")
 	cmdKipleSwagger.Flags().BoolVarP(&kipleSwagger.IsDebug, "debug", "", false, "open debug flag")
 
-	cmdKiple.AddCommand(cmdKipleSwagger)
+	cmdGen.AddCommand(cmdKipleSwagger)
 }
