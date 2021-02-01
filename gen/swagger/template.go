@@ -11,7 +11,6 @@ import (
 	"github.com/ghodss/yaml"
 	"go/format"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -108,10 +107,12 @@ type TemplateKipleSwagger struct {
 	template.GenTemplate
 	template.TemplateModel
 
-	ModelList    map[string]template.TemplateModel
-	TemplateIris TemplateIris
-	Swagger      SwaggerDocRoot
-	IsInit       uint8
+	ModelList        map[string]template.TemplateModel
+	TemplateIris     TemplateIris
+	Swagger          SwaggerDocRoot
+	IsInit           uint8
+	RouterName       string
+	ControllerBefore string
 }
 
 type TemplateIris struct {
@@ -133,11 +134,14 @@ type TemplateIrisApplication struct {
 }
 
 type TemplateIrisController struct {
-	Name string
-	Url  string
+	Package     string
+	Name        string
+	NewFuncName string // such as: func NewOnlineController() *OnlineController {}
+	Url         string
 }
 
 type TemplateIrisFunc struct {
+	Package          string
 	BelongController *TemplateIrisController
 	Url              string
 	Method           string
@@ -326,11 +330,12 @@ func (tm *TemplateKipleSwagger) getSwagResp(resp SwaggerPathResp) map[string]int
 	return pro
 }
 
-func (tm *TemplateKipleSwagger) parseFuncDef(controllerName, method, apiUrl, name, tag, comment string) error {
+func (tm *TemplateKipleSwagger) parseFuncDef(pkg, controllerName, method, apiUrl, name, tag, comment string) error {
 	method = strings.ToLower(strings.Trim(method, "\""))
 	apiUrl = strings.Trim(apiUrl, "\"")
 	name = strings.Trim(name, "\"")
 	api := TemplateIrisFunc{
+		Package:          pkg,
 		BelongController: nil,
 		Url:              apiUrl,
 		Method:           method,
@@ -350,8 +355,7 @@ func (tm *TemplateKipleSwagger) parseFuncDef(controllerName, method, apiUrl, nam
 	reqModelName := name + "Request"
 	if v, ok := tm.ModelList[reqModelName]; ok {
 		req = v
-	}
-	if req.ModelName != "" {
+		hasTag := false
 		for _, field := range req.TemplateModelFields {
 			if field.JsonName == "-" {
 				continue
@@ -367,35 +371,52 @@ func (tm *TemplateKipleSwagger) parseFuncDef(controllerName, method, apiUrl, nam
 				if _, ok := irisTagInMap[inStr]; !ok {
 					return fmt.Errorf("tag [%s] of field [%s] is not support", inStr, field.Name)
 				}
-			} else if strings.ToUpper(method) == http.MethodGet {
-				inStr = "query"
-			} else {
-				inStr = "body"
+				hasTag = true
+				break
 			}
-			requiredTag, _ := tags.Get("validate")
-			required := false
-			if requiredTag != nil {
-				if strings.Contains(requiredTag.Name, "required") {
-					required = true
-				}
-			}
-			swaggerPm := SwaggerDefinitionProperty{
-				Name:        field.JsonName,
-				In:          inStr,
-				Required:    required,
-				Description: field.Comment,
-				Type:        field.Type,
-				Package:     req.Package,
-			}
-			api.Parameters = append(api.Parameters, swaggerPm)
 		}
-	} else {
-		reqModelName = name + "Body"
-		if v, ok := tm.ModelList[reqModelName]; ok {
-			req = v
+		if hasTag {
+			for _, field := range req.TemplateModelFields {
+				if field.JsonName == "-" {
+					continue
+				}
+				tags, err := structtag.Parse(field.Tag)
+				if err != nil {
+					return err
+				}
+				inStr := ""
+				in, _ := tags.Get("in")
+				if in != nil {
+					inStr = in.Name
+					if _, ok := irisTagInMap[inStr]; !ok {
+						return fmt.Errorf("tag [%s] of field [%s] is not support", inStr, field.Name)
+					}
+				}
+				requiredTag, _ := tags.Get("validate")
+				required := false
+				if requiredTag != nil {
+					if strings.Contains(requiredTag.Name, "required") {
+						required = true
+					}
+				}
+				swaggerPm := SwaggerDefinitionProperty{
+					Name:        field.JsonName,
+					In:          inStr,
+					Required:    required,
+					Description: field.Comment,
+					Type:        field.Type,
+					Package:     req.Package,
+				}
+				api.Parameters = append(api.Parameters, swaggerPm)
+			}
+		} else {
+			in := "body"
+			if method == "get" {
+				in = "query"
+			}
 			swaggerPm := SwaggerDefinitionProperty{
 				Name:        "data",
-				In:          "body",
+				In:          in,
 				Required:    true,
 				Description: req.ModelComment,
 				Type:        req.ModelName,
@@ -572,17 +593,16 @@ func (tm *TemplateKipleSwagger) parseIrisParty(p interface{}) (resp TemplateIris
 		if !ok {
 			return
 		}
-		if selec.Sel.Name != "Party" {
-			return
-		}
-		resp.Url = strings.Trim(pt.Args[0].(*dst.BasicLit).Value, "\"")
-		parent := selec.X.(*dst.Ident).Name
-		if v, ok := tm.TemplateIris.Parties[parent]; ok {
-			resp.ParentParty = v
-			if v.Url[0] != '/' {
-				v.Url = "/" + v.Url
+		if selec.Sel.Name == "Party" {
+			resp.Url = strings.Trim(pt.Args[0].(*dst.BasicLit).Value, "\"")
+			parent := selec.X.(*dst.Ident).Name
+			if v, ok := tm.TemplateIris.Parties[parent]; ok {
+				resp.ParentParty = v
+				if v.Url[0] != '/' {
+					v.Url = "/" + v.Url
+				}
+				resp.Url = v.Url + resp.Url
 			}
-			resp.Url = v.Url + resp.Url
 		}
 	default:
 
@@ -590,57 +610,110 @@ func (tm *TemplateKipleSwagger) parseIrisParty(p interface{}) (resp TemplateIris
 	return
 }
 
-func (tm *TemplateKipleSwagger) parseIrisHandle(callReal *dst.CallExpr) (cons []*TemplateIrisController, p *TemplateIrisParty, err error) {
+func (tm *TemplateKipleSwagger) parseIrisHandle(callReal *dst.CallExpr) (cons []*TemplateIrisController, err error) {
 	cons = []*TemplateIrisController{}
-	switch fun := callReal.Fun.(type) {
-	case *dst.SelectorExpr:
-		switch call := fun.X.(type) {
-		case *dst.CallExpr:
-			cons, p, err = tm.parseIrisHandle(call)
-			if err != nil {
-				return
-			}
-		case *dst.Ident:
-			if call.Name == "mvc" && fun.Sel.Name == "New" {
-				tmp, e := tm.parseIrisParty(callReal.Args[0])
-				if e != nil {
-					err = e
-					return
-				}
-				p = &tmp
-				return
-			}
-		}
-		for _, argExpr := range callReal.Args {
-			switch arg := argExpr.(type) {
-			case *dst.UnaryExpr:
-				conName := arg.X.(*dst.CompositeLit).Type.(*dst.Ident).Name
-				tmp := TemplateIrisController{
-					Name: conName,
-					Url:  "",
-				}
-				if p != nil {
-					tmp.Url = p.Url
-				}
-				cons = append(cons, &tmp)
-			case *dst.CallExpr:
-				var tmps []*TemplateIrisController
-				tmps, p, err = tm.parseIrisHandle(arg)
-				if err != nil {
-					return
-				}
-				if len(tmps) > 0 {
-					cons = append(cons, tmps...)
-				}
-			}
-		}
-	case *dst.Ident:
-		// TODO(illidan/2020/12/21):
-	default:
-		err = errors.New("Cannot parse Expr")
+	fun, ok := callReal.Fun.(*dst.SelectorExpr)
+	if !ok {
+		err = errors.New("not selectorExpr")
+		return
+	}
+	if fun.Sel.Name != "Handle" {
+		err = errors.New("not Handle func")
 		return
 	}
 
+	var p TemplateIrisParty
+	funcx, ok := fun.X.(*dst.CallExpr)
+	if ok {
+		funcxf, ok := funcx.Fun.(*dst.SelectorExpr)
+		if ok && funcxf.Sel.Name == "New" && funcxf.X.(*dst.Ident).Name == "mvc" {
+			for _, funcArg := range funcx.Args {
+				p, err = tm.parseIrisParty(funcArg)
+				if err != nil {
+					return
+				}
+			}
+		}
+	}
+
+	for _, argExpr := range callReal.Args {
+		switch arg := argExpr.(type) {
+		case *dst.UnaryExpr:
+			conName := arg.X.(*dst.CompositeLit).Type.(*dst.Ident).Name
+			tmp := TemplateIrisController{
+				Name: conName,
+				Url:  "",
+			}
+			cons = append(cons, &tmp)
+		case *dst.CallExpr:
+			var pkg string
+			var funcName string
+			switch hfunc := arg.Fun.(type) {
+			case *dst.SelectorExpr:
+				pkg = hfunc.X.(*dst.Ident).Name
+				funcName = hfunc.Sel.Name
+			case *dst.Ident:
+				funcName = hfunc.Name
+			}
+			tmp := TemplateIrisController{
+				Package:     pkg,
+				NewFuncName: funcName,
+				Url:         p.Url,
+			}
+			cons = append(cons, &tmp)
+		}
+	}
+
+	//switch fun := callReal.Fun.(type) {
+	//case *dst.SelectorExpr:
+	//	switch call := fun.X.(type) {
+	//	case *dst.CallExpr:
+	//		cons, p, err = tm.parseIrisHandle(call)
+	//		if err != nil {
+	//			return
+	//		}
+	//	case *dst.Ident:
+	//		if call.Name == "mvc" && fun.Sel.Name == "New" {
+	//			tmp, e := tm.parseIrisParty(callReal.Args[0])
+	//			if e != nil {
+	//				err = e
+	//				return
+	//			}
+	//			p = &tmp
+	//			return
+	//		}
+	//	}
+	//	for _, argExpr := range callReal.Args {
+	//		switch arg := argExpr.(type) {
+	//		case *dst.UnaryExpr:
+	//			conName := arg.X.(*dst.CompositeLit).Type.(*dst.Ident).Name
+	//			tmp := TemplateIrisController{
+	//				Name: conName,
+	//				Url:  "",
+	//			}
+	//			if p != nil {
+	//				tmp.Url = p.Url
+	//			}
+	//			cons = append(cons, &tmp)
+	//		case *dst.CallExpr:
+	//			var tmps []*TemplateIrisController
+	//			tmps, p, err = tm.parseIrisHandle(arg)
+	//			if err != nil {
+	//				return
+	//			}
+	//			if len(tmps) > 0 {
+	//				cons = append(cons, tmps...)
+	//			}
+	//		}
+	//	}
+	//case *dst.Ident:
+	//	// TODO(illidan/2020/12/21):
+	//default:
+	//	err = errors.New("Cannot parse Expr")
+	//	return
+	//}
+	//
+	//return
 	return
 }
 
@@ -663,20 +736,25 @@ func (tm *TemplateKipleSwagger) parseIrisMvcConfig(call *dst.CallExpr) (err erro
 		}
 		callExpr, ok := exprStmt1.X.(*dst.CallExpr)
 		if ok {
-			tmps, _, err := tm.parseIrisHandle(callExpr)
+			tmps, err := tm.parseIrisHandle(callExpr)
 			if err != nil {
 				return err
 			}
 			for _, tmp := range tmps {
 				tmp.Url = p.Url
-				tm.TemplateIris.Controllers[tmp.Name] = *tmp
+				tm.TemplateIris.Controllers[tmp.Url] = *tmp
 			}
 		}
 	}
 	return
 }
 
-func (tm *TemplateKipleSwagger) parseIrisMvcFuncName(cName, name, comment string) error {
+func (tm *TemplateKipleSwagger) parseIrisMvcFuncName(pkg, cName, name, comment string) error {
+	// 已经记录到BeforeActivation的func，以BeforeActivation的为准，不再解析func名称中的method。
+	if _, ok := tm.TemplateIris.Funcs[cName+"-"+name]; ok {
+		return nil
+	}
+
 	k := 0
 	for i := 1; i < len(name); i++ {
 		if common.IsUpperLetter(rune(name[i])) {
@@ -690,14 +768,105 @@ func (tm *TemplateKipleSwagger) parseIrisMvcFuncName(cName, name, comment string
 	}
 	//name = common.ToLowerCamelCase(name[k:])
 	url := common.ToLowerSnakeCase(name[k:])
-	err := tm.parseFuncDef(cName, method, url, name, cName, comment)
+	err := tm.parseFuncDef(pkg, cName, method, url, name, cName, comment)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (tm *TemplateKipleSwagger) ParseControllerDir(dir string) error {
+func (tm *TemplateKipleSwagger) parseRouter(pkg string, fc *dst.FuncDecl) error {
+	for _, stmt := range fc.Body.List {
+		switch realStmt := stmt.(type) {
+		case *dst.ExprStmt:
+			call, ok := realStmt.X.(*dst.CallExpr)
+			if !ok {
+				continue
+			}
+			fun, ok := call.Fun.(*dst.SelectorExpr)
+			if !ok {
+				continue
+			}
+			switch fun.Sel.Name {
+			case "Configure":
+				tm.parseIrisMvcConfig(call)
+			default:
+				tmps, err := tm.parseIrisHandle(call)
+				if err != nil {
+					return err
+				}
+				for _, tmp := range tmps {
+					//tmp.Package = pkg
+					tm.TemplateIris.Controllers[tmp.Url] = *tmp
+				}
+			}
+		case *dst.AssignStmt:
+			for k, lh := range realStmt.Lhs {
+				if call, ok := realStmt.Rhs[k].(*dst.CallExpr); ok {
+					p, err := tm.parseIrisParty(call)
+					if err != nil {
+						return err
+					}
+					p.Name = lh.(*dst.Ident).Name
+					tm.TemplateIris.Parties[p.Name] = &p
+				}
+			}
+		default:
+		}
+	}
+	return nil
+}
+
+func (tm *TemplateKipleSwagger) parseContollerBefore(pkg string, fc *dst.FuncDecl) error {
+	for _, stmt := range fc.Body.List {
+		expr, ok := stmt.(*dst.ExprStmt)
+		if !ok {
+			continue
+		}
+		call, ok := expr.X.(*dst.CallExpr)
+		if !ok {
+			continue
+		}
+		if len(call.Args) < 3 {
+			break
+		}
+		method, ok := call.Args[0].(*dst.BasicLit)
+		url, ok := call.Args[1].(*dst.BasicLit)
+		name, ok := call.Args[2].(*dst.BasicLit)
+		comment := tm.ParseDstCommentFromNode(expr.Decs.NodeDecs, true)
+		controllerName := tm.ParseDstNodeType(fc.Recv.List[0].Type)
+		err := tm.parseFuncDef(pkg, controllerName, method.Value, url.Value, name.Value, controllerName, comment)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (tm *TemplateKipleSwagger) parseContoller(pkg string, fc *dst.FuncDecl) error {
+	// parse functions of controller
+	controllerName := tm.ParseDstNodeType(fc.Recv.List[0].Type)
+	if fun, ok := tm.TemplateIris.Funcs[fc.Name.Name]; ok && fun.BelongController != nil && fun.BelongController.Name == controllerName {
+		var oldDecs string
+		for _, v := range fc.Decs.Start.All() {
+			if !strings.Contains(v, "// @") {
+				oldDecs += v + "\n"
+			}
+		}
+		oldDecs = strings.Trim(oldDecs, "\n")
+		fun.Description = oldDecs
+		tm.TemplateIris.Funcs[fc.Name.Name] = fun
+	} else {
+		comment := tm.ParseDstCommentFromNode(fc.Decs.NodeDecs, true)
+		err := tm.parseIrisMvcFuncName(pkg, controllerName, fc.Name.Name, comment)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (tm *TemplateKipleSwagger) ParseControllerRouter(dir string) error {
 	if !common.IsExists(dir) {
 		return errors.New(dir + " is not exist")
 	}
@@ -707,104 +876,79 @@ func (tm *TemplateKipleSwagger) ParseControllerDir(dir string) error {
 	}
 	for _, file := range rd {
 		if file.IsDir() {
-			tm.ParseControllerDir(file.Name())
+			tm.ParseControllerRouter(file.Name())
 		} else {
 			dstFile, err := tm.GetDstTree(filepath.Join(dir, file.Name()))
 			if err != nil {
 				return err
 			}
+			pkg := dstFile.Name.Name
 			for _, decl := range dstFile.Decls {
 				fc, ok := decl.(*dst.FuncDecl)
 				if !ok {
 					continue
 				}
-				if fc.Name.Name == "BeforeActivation" {
-					for _, stmt := range fc.Body.List {
-						expr, ok := stmt.(*dst.ExprStmt)
-						if !ok {
-							continue
-						}
-						call, ok := expr.X.(*dst.CallExpr)
-						if !ok {
-							continue
-						}
-						if len(call.Args) < 3 {
-							break
-						}
-						method, ok := call.Args[0].(*dst.BasicLit)
-						url, ok := call.Args[1].(*dst.BasicLit)
-						name, ok := call.Args[2].(*dst.BasicLit)
-						comment := tm.ParseDstCommentFromNode(expr.Decs.NodeDecs, true)
-						controllerName := tm.ParseDstNodeType(fc.Recv.List[0].Type)
-						err = tm.parseFuncDef(controllerName, method.Value, url.Value, name.Value, controllerName, comment)
-						if err != nil {
-							return err
-						}
+				if fc.Name.Name == tm.RouterName {
+					err = tm.parseRouter(pkg, fc)
+					if err != nil {
+						return err
 					}
-				} else if fc.Name.Name == "RegisterGlobalModel" {
-					for _, stmt := range fc.Body.List {
-						switch realStmt := stmt.(type) {
-						case *dst.ExprStmt:
-							call, ok := realStmt.X.(*dst.CallExpr)
-							if !ok {
-								continue
-							}
-							fun, ok := call.Fun.(*dst.SelectorExpr)
-							if !ok {
-								continue
-							}
-							switch fun.Sel.Name {
-							case "Configure":
-								tm.parseIrisMvcConfig(call)
-							default:
-								tmps, _, err := tm.parseIrisHandle(call)
-								if err != nil {
-									return err
-								}
-								for _, tmp := range tmps {
-									tm.TemplateIris.Controllers[tmp.Name] = *tmp
-								}
-								continue
-							}
+				} else {
+					continue
+				}
+			}
+		}
+	}
+	return nil
+}
 
-						case *dst.AssignStmt:
-							for k, lh := range realStmt.Lhs {
-								if call, ok := realStmt.Rhs[k].(*dst.CallExpr); ok {
-									p, err := tm.parseIrisParty(call)
-									if err != nil {
-										return err
-									}
-									p.Name = lh.(*dst.Ident).Name
-									tm.TemplateIris.Parties[p.Name] = &p
-								}
-							}
-						default:
-
-						}
+func (tm *TemplateKipleSwagger) ParseControllers(dir string) error {
+	if !common.IsExists(dir) {
+		return errors.New(dir + " is not exist")
+	}
+	rd, err := ioutil.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	for _, file := range rd {
+		if file.IsDir() {
+			tm.ParseControllers(filepath.Join(dir, file.Name()))
+		} else {
+			dstFile, err := tm.GetDstTree(filepath.Join(dir, file.Name()))
+			if err != nil {
+				return err
+			}
+			pkg := dstFile.Name.Name // package name
+			for _, decl := range dstFile.Decls {
+				fc, ok := decl.(*dst.FuncDecl)
+				if !ok {
+					continue
+				}
+				if fc.Name.Name == tm.ControllerBefore {
+					err = tm.parseContollerBefore(pkg, fc)
+					if err != nil {
+						return err
 					}
+				} else if fc.Name.Name == tm.RouterName {
+
 				} else if fc.Recv != nil && len(fc.Recv.List) > 0 {
-					// parse functions of controller
-					controllerName := tm.ParseDstNodeType(fc.Recv.List[0].Type)
-					if fun, ok := tm.TemplateIris.Funcs[fc.Name.Name]; ok && fun.BelongController != nil && fun.BelongController.Name == controllerName {
-						var oldDecs string
-						for _, v := range fc.Decs.Start.All() {
-							if !strings.Contains(v, "// @") {
-								oldDecs += v + "\n"
+					err = tm.parseContoller(pkg, fc)
+					if err != nil {
+						return err
+					}
+				} else {
+					// parse NewControllerFunc
+					for _, field := range fc.Type.Results.List {
+						respController := field.Type.(*dst.StarExpr).X.(*dst.Ident).Name
+						for k, controller := range tm.TemplateIris.Controllers {
+							if controller.Name == "" && controller.NewFuncName == fc.Name.Name && controller.Package == pkg {
+								controller.Name = respController
+								tm.TemplateIris.Controllers[k] = controller
 							}
-						}
-						oldDecs = strings.Trim(oldDecs, "\n")
-						fun.Description = oldDecs
-						tm.TemplateIris.Funcs[fc.Name.Name] = fun
-					} else {
-						comment := tm.ParseDstCommentFromNode(fc.Decs.NodeDecs, true)
-						err = tm.parseIrisMvcFuncName(controllerName, fc.Name.Name, comment)
-						if err != nil {
-							return err
 						}
 					}
 				}
 			}
-
 			if tm.IsInit != 0 {
 				err = tm.genDstFileToFile(filepath.Join(dir, file.Name()), dstFile)
 				if err != nil {
@@ -813,7 +957,6 @@ func (tm *TemplateKipleSwagger) ParseControllerDir(dir string) error {
 			}
 		}
 	}
-
 	return nil
 }
 
@@ -827,7 +970,7 @@ func (tm *TemplateKipleSwagger) OverWriteControllerDir(dir string) error {
 	}
 	for _, file := range rd {
 		if file.IsDir() {
-			tm.OverWriteControllerDir(file.Name())
+			tm.OverWriteControllerDir(filepath.Join(dir, file.Name()))
 		} else {
 			dstFile, err := tm.GetDstTree(filepath.Join(dir, file.Name()))
 			if err != nil {
@@ -916,8 +1059,11 @@ func (tm *TemplateKipleSwagger) OverWriteControllerDir(dir string) error {
 // Set Swagger Paths with new url
 func (tm *TemplateKipleSwagger) SetSwaggerPaths() error {
 	for k, irisFunc := range tm.TemplateIris.Funcs {
-		if con, ok := tm.TemplateIris.Controllers[irisFunc.Tag]; ok {
-			irisFunc.BelongController = &con
+		for _, controller := range tm.TemplateIris.Controllers {
+			if controller.Name == irisFunc.Tag && controller.Package == irisFunc.Package {
+				irisFunc.BelongController = &controller
+				break
+			}
 		}
 		tm.TemplateIris.Funcs[k] = irisFunc
 	}
@@ -936,13 +1082,10 @@ func (tm *TemplateKipleSwagger) SetSwaggerPaths() error {
 			Parameters:  []map[string]interface{}{},
 			Responses:   map[string]map[string]interface{}{},
 		}
-		newPath := path.Url
-		if p, ok := tm.TemplateIris.Controllers[path.Tag]; ok {
-			u := strings.Trim(p.Url, "/")
-			path.Url = strings.Trim(path.Url, "/")
-			newPath = fmt.Sprintf("/%s/%s", u, path.Url)
+		if path.Url[0] != '/' {
+			path.Url = "/" + path.Url
 		}
-		path.Url = newPath
+		path.Url = path.BelongController.Url + path.Url
 		tm.TemplateIris.Funcs[k] = path
 
 		for _, param := range path.Parameters {
@@ -953,11 +1096,11 @@ func (tm *TemplateKipleSwagger) SetSwaggerPaths() error {
 			api.Responses[resp.ResponseCode] = tm.getSwagResp(resp)
 		}
 
-		if p, ok := tm.Swagger.Paths[newPath]; ok {
+		if p, ok := tm.Swagger.Paths[path.Url]; ok {
 			p[path.Method] = api
-			tm.Swagger.Paths[newPath] = p
+			tm.Swagger.Paths[path.Url] = p
 		} else {
-			tm.Swagger.Paths[newPath] = map[string]SwaggerPath{
+			tm.Swagger.Paths[path.Url] = map[string]SwaggerPath{
 				path.Method: api,
 			}
 		}

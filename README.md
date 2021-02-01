@@ -2,12 +2,16 @@
 
 - install
 
+需要提前配置GOBIN目录到系统环境变量；
 ```
 git clone git@github.com:illidan33/tools.git
 
 cd tools
 
 go install
+
+# show cmd of tools
+tools -h
 ```
 
 the cmd file 'tools' will be installed to your $GOBIN directory.
@@ -39,28 +43,26 @@ the cmd file 'tools' will be installed to your $GOBIN directory.
 根据swagger文件反解析生成对应的api
 ```
 
-- kiple daocreate
+- gen dmethod
 
 ```
-//go:generate tools kiple daocreate [option]
+//go:generate tools gen dmethod [option]
 
 根据entity批量生成kiple对应的常用的数据库操作func
 ```
 
-- kiple methodsync
+- gen msync
 
 ```
-//go:generate tools kiple methodsync [option]
+//go:generate tools gen msync [option]
 
 同步model的所有funcs到interface中
 ```
 
-- kiple swag
+- gen swag
     - 需要在main.go文件所在目录运行命令;
-    - 入参规则：
-        - 仅body或query参数时，入参struct取名规则：{{func name}}Request;
-        - 当存在path、header参数时,入参struct取名规则：{{func name}}RequestWl，并且struc中每个字段需要定义标签'in'，标识属于'body' or 'query' or 'path' or 'header';
-        - query/path/header字段可定义标签: validate:"required"；
+    - 入参取名规则：{{func name}}Request
+      - struc中每个字段需要定义标签'in'，标识属于'body' or 'query' or 'path' or 'header', query/path/header字段可定义标签: validate:"required";
+      - 如果没有标签，默认整个struct为body（method不为GET）或者query（method为GET）；
     - 返回参数规则: {{func name}}Response;
-    - controller注册func名称必须为"RegisterGlobalModel";
     - BeforeActivation必须放置每个文件开头；

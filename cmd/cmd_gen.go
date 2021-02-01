@@ -6,7 +6,7 @@ import (
 
 var cmdGen = &cobra.Command{
 	Use:   "gen",
-	Short: "generate functions of product",
+	Short: "generate tools",
 	Run: func(cmd *cobra.Command, args []string) {
 	},
 }

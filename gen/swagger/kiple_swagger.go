@@ -3,10 +3,6 @@ package swagger
 import (
 	"errors"
 	"fmt"
-	"go/build"
-	"go/parser"
-	"go/token"
-	"golang.org/x/tools/go/loader"
 	"path/filepath"
 	"tools/common"
 	"tools/template"
@@ -69,6 +65,8 @@ func (cmdtp *CmdKipleSwagger) Init() error {
 	cmdtp.Template.Swagger.Paths = map[string]map[string]SwaggerPath{}
 	cmdtp.Template.Swagger.Definitions = map[string]SwaggerDefinition{}
 	cmdtp.Template.IsInit = cmdtp.IsInit
+	cmdtp.Template.RouterName = "RegisterGlobalModel"
+	cmdtp.Template.ControllerBefore = "BeforeActivation"
 
 	return nil
 }
@@ -79,31 +77,6 @@ func (cmdtp *CmdKipleSwagger) Parse() error {
 	}
 
 	var err error
-	ldr := loader.Config{
-		AllowErrors: true,
-		ParserMode:  parser.ParseComments,
-	}
-
-	pkg, err := build.ImportDir(cmdtp.Environments.CmdDir+"/controller", build.FindOnly)
-	if err != nil {
-		panic(err)
-	}
-	ldr.Import(pkg.ImportPath)
-
-	p, err := ldr.Load()
-	if err != nil {
-		panic(err)
-	}
-	////pkg, err := cmdtp.Template.GetTypesPackage(cmdtp.Environments.CmdDir + "/controller")
-	////if err != nil {
-	////	return err
-	////}
-	p.Fset.Iterate(func(file *token.File) bool {
-		fmt.Println(file.Name())
-		return true
-	})
-	fmt.Println(p.AllPackages)
-
 	err = cmdtp.Template.ParseSwagTitle(filepath.Join(cmdtp.Environments.CmdDir, cmdtp.Environments.CmdFileName))
 	if err != nil {
 		return err
@@ -114,7 +87,11 @@ func (cmdtp *CmdKipleSwagger) Parse() error {
 		return err
 	}
 
-	err = cmdtp.Template.ParseControllerDir(cmdtp.Controller)
+	err = cmdtp.Template.ParseControllerRouter(cmdtp.Controller)
+	if err != nil {
+		return err
+	}
+	err = cmdtp.Template.ParseControllers(cmdtp.Controller)
 	if err != nil {
 		return err
 	}
@@ -122,13 +99,14 @@ func (cmdtp *CmdKipleSwagger) Parse() error {
 	if err != nil {
 		return err
 	}
-	err = cmdtp.Template.OverWriteControllerDir(cmdtp.Controller)
-	if err != nil {
-		return err
-	}
 
 	if cmdtp.Template.IsInit == 0 {
 		err = cmdtp.Template.FormatToFiles(cmdtp.Environments.CmdDir)
+		if err != nil {
+			return err
+		}
+	} else {
+		err = cmdtp.Template.OverWriteControllerDir(cmdtp.Controller)
 		if err != nil {
 			return err
 		}

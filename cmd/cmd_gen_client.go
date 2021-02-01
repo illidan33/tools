@@ -10,7 +10,7 @@ import (
 var genClient client.CmdGenClient
 var cmdGenClient = &cobra.Command{
 	Use:   "client",
-	Short: "Generate swagger doc to client api",
+	Short: "Generate client api from swagger doc",
 	Run: func(cmd *cobra.Command, args []string) {
 		common.CmdDo(&genClient)
 	},

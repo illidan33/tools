@@ -8,8 +8,8 @@ import (
 
 var kipleDao dao_create.CmdKipleDao
 var cmdkipleDao = &cobra.Command{
-	Use:   "daocreate",
-	Short: "generate methods of entity dao",
+	Use:   "dmethod",
+	Short: "generate methods of entity dao(for kiple)",
 	Run: func(cmd *cobra.Command, args []string) {
 		common.CmdDo(&kipleDao)
 	},

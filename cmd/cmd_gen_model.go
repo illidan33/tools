@@ -9,7 +9,7 @@ import (
 var genModel model.CmdGenModel
 var cmdGenModel = &cobra.Command{
 	Use:   "model",
-	Short: "convert ddl to golang struct with index.",
+	Short: "convert ddl sqls to golang struct with index.",
 	Run: func(cmd *cobra.Command, args []string) {
 		common.CmdDo(&genModel)
 	},
