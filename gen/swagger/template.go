@@ -9,8 +9,8 @@ import (
 	"github.com/dave/dst/decorator"
 	"github.com/fatih/structtag"
 	"github.com/ghodss/yaml"
-	"go/format"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -453,7 +453,8 @@ func (tm *TemplateKipleSwagger) ParsePojoDir(dir string) error {
 	}
 	for _, model := range mList {
 		if _, ok := tm.ModelList[model.ModelName]; ok {
-			return errors.New("ParsePojoDir - model name repeat.")
+			log.Println("ParsePojoDir - model name repeat:" + model.ModelName)
+			continue
 		}
 		tm.ModelList[model.ModelName] = model
 	}
@@ -462,20 +463,19 @@ func (tm *TemplateKipleSwagger) ParsePojoDir(dir string) error {
 }
 
 func (tm *TemplateKipleSwagger) genDstFileToFile(dstFilePath string, node *dst.File) (err error) {
-	fset, af, e := decorator.RestoreFile(node)
-	if e != nil {
-		err = e
+	bt := bytes.NewBuffer([]byte{})
+	err = decorator.Fprint(bt, node)
+	if err != nil {
+		log.Println(dstFilePath +" genDstFileToFile error: " + err.Error())
 		return
 	}
-
 	var file *os.File
 	file, err = os.OpenFile(dstFilePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
-	err = format.Node(file, fset, af)
-
+	_,err = file.Write(bt.Bytes())
 	return
 }
 
@@ -572,9 +572,11 @@ func (tm *TemplateKipleSwagger) ParseSwagTitle(file string) error {
 		}
 		dstFile.Imports = append(dstFile.Imports, docImp)
 	}
-	err = tm.genDstFileToFile(file, dstFile)
-	if err != nil {
-		return errors.New("FormatCodeToFile - write file error: " + err.Error())
+	if tm.IsInit != 0 {
+		err = tm.genDstFileToFile(file, dstFile)
+		if err != nil {
+			return errors.New("FormatCodeToFile - write file error: " + err.Error())
+		}
 	}
 	return nil
 }
@@ -626,11 +628,13 @@ func (tm *TemplateKipleSwagger) parseIrisHandle(callReal *dst.CallExpr) (cons []
 	funcx, ok := fun.X.(*dst.CallExpr)
 	if ok {
 		funcxf, ok := funcx.Fun.(*dst.SelectorExpr)
-		if ok && funcxf.Sel.Name == "New" && funcxf.X.(*dst.Ident).Name == "mvc" {
-			for _, funcArg := range funcx.Args {
-				p, err = tm.parseIrisParty(funcArg)
-				if err != nil {
-					return
+		if ok {
+			if (funcxf.Sel.Name == "New" || funcxf.Sel.Name == "Configure") && funcxf.X.(*dst.Ident).Name == "mvc" {
+				for _, funcArg := range funcx.Args {
+					p, err = tm.parseIrisParty(funcArg)
+					if err != nil {
+						return
+					}
 				}
 			}
 		}
@@ -875,10 +879,11 @@ func (tm *TemplateKipleSwagger) ParseControllerRouter(dir string) error {
 		return err
 	}
 	for _, file := range rd {
+		fpath := filepath.Join(dir, file.Name())
 		if file.IsDir() {
 			tm.ParseControllerRouter(file.Name())
 		} else {
-			dstFile, err := tm.GetDstTree(filepath.Join(dir, file.Name()))
+			dstFile, err := tm.GetDstTree(fpath)
 			if err != nil {
 				return err
 			}
@@ -911,10 +916,11 @@ func (tm *TemplateKipleSwagger) ParseControllers(dir string) error {
 		return err
 	}
 	for _, file := range rd {
+		fpath := filepath.Join(dir, file.Name())
 		if file.IsDir() {
-			tm.ParseControllers(filepath.Join(dir, file.Name()))
+			tm.ParseControllers(fpath)
 		} else {
-			dstFile, err := tm.GetDstTree(filepath.Join(dir, file.Name()))
+			dstFile, err := tm.GetDstTree(fpath)
 			if err != nil {
 				return err
 			}
@@ -949,12 +955,12 @@ func (tm *TemplateKipleSwagger) ParseControllers(dir string) error {
 					}
 				}
 			}
-			if tm.IsInit != 0 {
-				err = tm.genDstFileToFile(filepath.Join(dir, file.Name()), dstFile)
-				if err != nil {
-					return errors.New("FormatCodeToFile - write file error: " + err.Error())
-				}
-			}
+			//if tm.IsInit != 0 {
+			//	err = tm.genDstFileToFile(fpath, dstFile)
+			//	if err != nil {
+			//		return errors.New("FormatCodeToFile - write file error: " + err.Error())
+			//	}
+			//}
 		}
 	}
 	return nil
@@ -969,10 +975,11 @@ func (tm *TemplateKipleSwagger) OverWriteControllerDir(dir string) error {
 		return err
 	}
 	for _, file := range rd {
+		fpath := filepath.Join(dir, file.Name())
 		if file.IsDir() {
-			tm.OverWriteControllerDir(filepath.Join(dir, file.Name()))
+			tm.OverWriteControllerDir(fpath)
 		} else {
-			dstFile, err := tm.GetDstTree(filepath.Join(dir, file.Name()))
+			dstFile, err := tm.GetDstTree(fpath)
 			if err != nil {
 				return err
 			}
@@ -1047,7 +1054,7 @@ func (tm *TemplateKipleSwagger) OverWriteControllerDir(dir string) error {
 					}
 				}
 			}
-			err = tm.genDstFileToFile(filepath.Join(dir, file.Name()), dstFile)
+			err = tm.genDstFileToFile(fpath, dstFile)
 			if err != nil {
 				return errors.New("FormatCodeToFile - write file error: " + err.Error())
 			}
@@ -1071,7 +1078,8 @@ func (tm *TemplateKipleSwagger) SetSwaggerPaths() error {
 	tm.Swagger.Paths = map[string]map[string]SwaggerPath{}
 	for k, path := range tm.TemplateIris.Funcs {
 		if path.BelongController == nil {
-			return errors.New("not found controller:" + path.Tag)
+			log.Println("not found controller:" + path.Tag)
+			continue
 		}
 		api := SwaggerPath{
 			Consumes:    path.Consumes,

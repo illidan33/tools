@@ -66,3 +66,4 @@ the cmd file 'tools' will be installed to your $GOBIN directory.
       - 如果没有标签，默认整个struct为body（method不为GET）或者query（method为GET）；
     - 返回参数规则: {{func name}}Response;
     - BeforeActivation必须放置每个文件开头；
+    - controller注册函数名称需要为：RegisterGlobalModel;
