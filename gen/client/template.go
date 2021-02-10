@@ -232,7 +232,7 @@ func (tgc *TemplateGenClient) parseDefinitionProperty(modleName string, proName 
 				if err != nil {
 					return nil, err
 				}
-				model.TemplateModelFields = append(model.TemplateModelFields, *field)
+				model.TemplateModelFields = append(model.TemplateModelFields, field)
 			}
 		}
 
@@ -267,7 +267,7 @@ func (tgc *TemplateGenClient) parseDefinitions(defs map[string]GenClientDefiniti
 				if err != nil {
 					return err
 				}
-				f.TemplateModelFields = append(f.TemplateModelFields, *field)
+				f.TemplateModelFields = append(f.TemplateModelFields, field)
 			}
 		default:
 			return errors.New("unknow swagger property type: " + def.Type)
@@ -320,7 +320,7 @@ func (tgc *TemplateGenClient) parseFuncs(funcs []GenClientFunc) error {
 			} else {
 				field.Type = tgc.transformGoType(parameter.Type)
 			}
-			f.RequestModel.TemplateModelFields = append(f.ResponseModel.TemplateModelFields, field)
+			f.RequestModel.TemplateModelFields = append(f.ResponseModel.TemplateModelFields, &field)
 		}
 		tgc.ParamModels = append(tgc.ParamModels, f.RequestModel)
 		for code, response := range clientFunc.Responses {

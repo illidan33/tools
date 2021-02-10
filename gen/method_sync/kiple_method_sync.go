@@ -38,7 +38,7 @@ func (cmdtp *CmdKipleInterfaceCheck) Init() error {
 	if cmdtp.IsDebug {
 		fmt.Printf("%#v\n", cmdtp.Environments)
 		if cmdtp.Environments.PackageName == "main" {
-			cmdtp.Environments.CmdDir = filepath.Join(common.GetGoPath(), "/src/github.com/illidan33/gotest/tools_test/example/entity")
+			cmdtp.Environments.CmdDir = filepath.Join(common.GetGoPath(), "/github.com/illidan33/gotest/tools_test/example/entity")
 			cmdtp.Environments.CmdFileName = "user_profiles_dao.go"
 		}
 	}

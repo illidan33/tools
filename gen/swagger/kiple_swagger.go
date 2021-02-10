@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"tools/common"
-	"tools/template"
 )
 
 type CmdKipleSwagger struct {
@@ -35,7 +34,7 @@ func (cmdtp *CmdKipleSwagger) Init() error {
 	if cmdtp.IsDebug {
 		fmt.Printf("%#v\n", cmdtp.Environments)
 		if cmdtp.Environments.PackageName == "main" {
-			cmdtp.Environments.CmdDir = filepath.Join(common.GetGoPath(), "/src/github.com/illidan33/tools/example/swag")
+			cmdtp.Environments.CmdDir = filepath.Join(common.GetGoPath(), "/github.com/illidan33/tools/example/swag")
 			cmdtp.Environments.CmdFileName = "main.go"
 			cmdtp.Environments.CmdLine = "7"
 		}
@@ -48,7 +47,7 @@ func (cmdtp *CmdKipleSwagger) Init() error {
 	if err != nil {
 		return err
 	}
-	cmdtp.Template.ModelList = map[string]template.TemplateModel{}
+	//cmdtp.Template.ModelList = map[string]template.TemplatePkgModel{}
 	cmdtp.Template.Swagger.Swagger = "2.0"
 	cmdtp.Template.TemplateIris = TemplateIris{
 		Parties:      map[string]*TemplateIrisParty{},
@@ -81,7 +80,6 @@ func (cmdtp *CmdKipleSwagger) Parse() error {
 	if err != nil {
 		return err
 	}
-
 	err = cmdtp.Template.ParsePojoDir(cmdtp.Pojo)
 	if err != nil {
 		return err

@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dave/dst"
-	"tools/common"
 	"path/filepath"
 	"strings"
+	"tools/common"
 )
 
 type CmdKipleDao struct {
@@ -31,7 +31,7 @@ func (cmdtp *CmdKipleDao) Init() (err error) {
 		fmt.Printf("environment: %#v\n", cmdtp.Environments)
 		if cmdtp.Environments.PackageName == "main" {
 			cmdtp.Environments.PackageName = "entity"
-			cmdtp.Environments.CmdDir = filepath.Join(common.GetGoPath(), "/src/github.com/illidan33/tools/example/entity")
+			cmdtp.Environments.CmdDir = filepath.Join(common.GetGoPath(), "/github.com/illidan33/tools/example/entity")
 		}
 	}
 	cmdtp.Template.PackageName = cmdtp.Environments.PackageName
@@ -48,12 +48,12 @@ func (cmdtp *CmdKipleDao) Parse() (err error) {
 
 	pathDir := filepath.Dir(path)
 	var pathPackage string
-	pathPackage, err = common.GetPackageNameFromPath(pathDir)
+	pathPackage, err = common.GetPackageNameFromDir(pathDir)
 	if err != nil {
 		return
 	}
 	if cmdtp.Template.PackageName != pathPackage {
-		pkgPath, err := common.GetDirFromPackage(pathDir)
+		pkgPath, err := common.GetDirFromImport(pathDir)
 		if err != nil {
 			return err
 		}

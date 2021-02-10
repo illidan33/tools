@@ -36,7 +36,7 @@ func (cmdtp *CmdGenModel) Init() error {
 		fmt.Printf("%#v\n", cmdtp.Environments)
 		if cmdtp.Environments.PackageName == "main" {
 			cmdtp.Environments.PackageName = "model_test"
-			cmdtp.Environments.CmdDir = filepath.Join(common.GetGoPath(), "/src/github.com/illidan33/tools/example/model")
+			cmdtp.Environments.CmdDir = filepath.Join(common.GetGoPath(), "/github.com/illidan33/tools/example/model")
 			cmdtp.Environments.CmdFileName = "gen.go"
 		}
 	}

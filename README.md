@@ -67,3 +67,4 @@ the cmd file 'tools' will be installed to your $GOBIN directory.
     - 返回参数规则: {{func name}}Response;
     - BeforeActivation必须放置每个文件开头；
     - controller注册函数名称需要为：RegisterGlobalModel;
+    - pojo中的entity名称不能重复, 如果需要重复，entity所在包名需要保持与controller的包名一致；

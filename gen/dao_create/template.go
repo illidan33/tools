@@ -182,7 +182,7 @@ type CmdKipleDaoIndex struct {
 	Fields []template.TemplateModelField
 }
 
-func (tgm *KipleTemplateDao) joinConditionFields(fields []template.TemplateModelField) string {
+func (tgm *KipleTemplateDao) joinConditionFields(fields []*template.TemplateModelField) string {
 	rs := ""
 	for i, arg := range fields {
 		if i == 0 {

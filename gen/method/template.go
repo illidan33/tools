@@ -138,10 +138,10 @@ type TemplateDataMethodFunc struct {
 type TemplateDataMethodIndex struct {
 	Name   string
 	Type   types.IndexType
-	Fields []template.TemplateModelField
+	Fields []*template.TemplateModelField
 }
 
-func (gt *TemplateDataMethod) GenFuncName(fields []template.TemplateModelField) string {
+func (gt *TemplateDataMethod) GenFuncName(fields []*template.TemplateModelField) string {
 	str := ""
 	for i, f := range fields {
 		if i == 0 {
@@ -153,7 +153,7 @@ func (gt *TemplateDataMethod) GenFuncName(fields []template.TemplateModelField) 
 	return common.ToUpperCamelCase(str)
 }
 
-func (tgm *TemplateDataMethod) JoinFields(targetName string, fields []template.TemplateModelField) string {
+func (tgm *TemplateDataMethod) JoinFields(targetName string, fields []*template.TemplateModelField) string {
 	rs := ""
 	for i, arg := range fields {
 		if i == 0 {
@@ -165,7 +165,7 @@ func (tgm *TemplateDataMethod) JoinFields(targetName string, fields []template.T
 	return rs
 }
 
-func (tgm *TemplateDataMethod) JoinWhere(fields []template.TemplateModelField) string {
+func (tgm *TemplateDataMethod) JoinWhere(fields []*template.TemplateModelField) string {
 	rs := ""
 	for i, arg := range fields {
 		name := common.ToLowerSnakeCase(arg.GormName)
@@ -178,7 +178,7 @@ func (tgm *TemplateDataMethod) JoinWhere(fields []template.TemplateModelField) s
 	return rs
 }
 
-func (tgm *TemplateDataMethod) JoinConditions(fields []template.TemplateModelField) string {
+func (tgm *TemplateDataMethod) JoinConditions(fields []*template.TemplateModelField) string {
 	rs := ""
 	for i, arg := range fields {
 		if i == 0 {
@@ -287,7 +287,7 @@ func (tm *TemplateDataMethod) parseTagToTokens(s string) (rs []string, e error) 
 	return
 }
 
-func (tm *TemplateDataMethod) ParseDecsToIndex(decs dst.Decorations, fieldMap *map[string]template.TemplateModelField) error {
+func (tm *TemplateDataMethod) ParseDecsToIndex(decs dst.Decorations, fieldMap map[string]*template.TemplateModelField) error {
 	for _, dec := range decs {
 		if strings.Contains(dec, "@def") {
 			arr := strings.Split(dec, " ")
@@ -308,9 +308,9 @@ func (tm *TemplateDataMethod) ParseDecsToIndex(decs dst.Decorations, fieldMap *m
 					tgmci.Type = types.INDEX_TYPE__FOREIGN_INDEX
 				default:
 				}
-				tgmci.Fields = make([]template.TemplateModelField, 0)
+				tgmci.Fields = make([]*template.TemplateModelField, 0)
 				for i := 3; i < len(arr); i++ {
-					if f, ok := (*fieldMap)[arr[i]]; !ok {
+					if f, ok := fieldMap[arr[i]]; !ok {
 						return fmt.Errorf("index field of comment def is not struct field: %s", arr[i])
 					} else {
 						tgmci.Fields = append(tgmci.Fields, f)
@@ -323,10 +323,10 @@ func (tm *TemplateDataMethod) ParseDecsToIndex(decs dst.Decorations, fieldMap *m
 	return nil
 }
 
-func (tm *TemplateDataMethod) parseTypesVar(v *gotypes.Var, tag string) []template.TemplateModelField {
+func (tm *TemplateDataMethod) parseTypesVar(v *gotypes.Var, tag string) []*template.TemplateModelField {
 	if v.Embedded() {
 		t := v.Type()
-		str := make([]template.TemplateModelField, 0)
+		str := make([]*template.TemplateModelField, 0)
 		if ts, ok := t.Underlying().(*gotypes.Struct); ok {
 			for i := 0; i < ts.NumFields(); i++ {
 				tmp := tm.parseTypesVar(ts.Field(i), ts.Tag(i))
@@ -341,7 +341,7 @@ func (tm *TemplateDataMethod) parseTypesVar(v *gotypes.Var, tag string) []templa
 			Tag:     tag,
 			Comment: "",
 		}
-		return []template.TemplateModelField{templateField}
+		return []*template.TemplateModelField{&templateField}
 	}
 }
 
@@ -361,7 +361,7 @@ func (tm *TemplateDataMethod) ParseDstTree(file *dst.File) error {
 		// this entity model name
 		tm.ModelName = tf.Name.Name
 
-		fieldMap := map[string]template.TemplateModelField{}
+		fieldMap := map[string]*template.TemplateModelField{}
 		if len(tm.TemplateModelFields) == 0 {
 			st, ok := tf.Type.(*dst.StructType)
 			if !ok {
@@ -416,8 +416,8 @@ func (tm *TemplateDataMethod) ParseDstTree(file *dst.File) error {
 					}
 					templateField.Type += "." + ExprType.Sel.Name
 				}
-				fieldMap[templateField.Name] = templateField
-				tm.TemplateModelFields = append(tm.TemplateModelFields, templateField)
+				fieldMap[templateField.Name] = &templateField
+				tm.TemplateModelFields = append(tm.TemplateModelFields, &templateField)
 			}
 		} else {
 			for _, field := range tm.TemplateModelFields {
@@ -428,7 +428,7 @@ func (tm *TemplateDataMethod) ParseDstTree(file *dst.File) error {
 		// comment def of struct
 		if gd.Decs.NodeDecs.Start != nil {
 			decs := gd.Decs.NodeDecs.Start
-			err := tm.ParseDecsToIndex(decs, &fieldMap)
+			err := tm.ParseDecsToIndex(decs, fieldMap)
 			if err != nil {
 				return err
 			}
@@ -446,7 +446,7 @@ func (tm *TemplateDataMethod) ParseImportFile(filePath string) error {
 	}
 
 	elem := pkg.Scope().Lookup(tm.ModelName)
-	strArr := make([]template.TemplateModelField, 0)
+	strArr := make([]*template.TemplateModelField, 0)
 	if named, ok := elem.Type().(*gotypes.Named); ok {
 		if ts, ok := named.Underlying().(*gotypes.Struct); ok {
 			for i := 0; i < ts.NumFields(); i++ {

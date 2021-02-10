@@ -3,9 +3,9 @@ package common
 import (
 	"errors"
 	"fmt"
-	"github.com/dave/kerr"
 	"go/build"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -26,7 +26,7 @@ func GetGenEnvironmentValues() (path CmdFilePath, err error) {
 		return
 	}
 	if path.PackageName == "" {
-		path.PackageName, _ = GetPackageNameFromPath(path.CmdDir)
+		path.PackageName, _ = GetPackageNameFromDir(path.CmdDir)
 	}
 	if path.Sys == "" {
 		path.Sys = runtime.GOOS
@@ -37,26 +37,67 @@ func GetGenEnvironmentValues() (path CmdFilePath, err error) {
 	return
 }
 
-func GetBuildPackageFromDir(path string) (*build.Package, error) {
-	pkg, err := build.ImportDir(path, build.FindOnly)
+func GetBuildPackageFromDir(dir string) (*build.Package, error) {
+	pkg, err := build.ImportDir(dir, build.FindOnly)
 	if err != nil {
 		return nil, err
 	}
 	return pkg, nil
 }
 
-func GetDirFromPackage(pkg string) (string, error) {
-	if pkg[0] != '/' {
-		pkg = filepath.Join(GetGoPath(), "src", pkg)
-	}
-	p, err := build.ImportDir(pkg, build.FindOnly)
+// response total import path
+func GetImportPathFromDir(dir string) string {
+	return strings.TrimPrefix(dir, GetGoPath()+"/")
+}
+
+func GetImportPathFromFile(filePath string) string {
+	return strings.TrimPrefix(path.Dir(filePath), GetGoPath()+"/")
+}
+
+// such as tools/xxx, parse to github.com/illidan33/tools/xxx
+func GetTotalImportPathFromImport(imPath string) (string, error) {
+	dir, err := GetDirFromImport(imPath)
 	if err != nil {
 		return "", err
 	}
-	return p.Dir, nil
+	return GetImportPathFromDir(dir), nil
 }
 
-func GetPackageNameFromPath(path string) (string, error) {
+// response abs dir path
+func GetDirFromImport(importPath string) (string, error) {
+	i := strings.Index(importPath, string(filepath.Separator))
+	firstDirName := importPath[:i]
+	lastDirPath := importPath[i+1:]
+	pwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	var file string
+	dir := pwd
+	for {
+		tmp := path.Join(dir, "/", importPath)
+		// 当前项目的go mod的module名称跟目录名称不一致的情况
+		tmpp := path.Join(dir, "/", lastDirPath)
+		if file == firstDirName {
+			fmt.Println(tmp)
+			return tmp, nil
+		} else if IsExists(tmp) {
+			fmt.Println(tmp)
+			return tmp, nil
+		} else if IsExists(tmpp) {
+			fmt.Println(tmpp)
+			return tmpp, nil
+		}
+		if dir == "" || dir == "/" {
+			break
+		}
+		file = path.Base(dir)
+		dir = path.Dir(dir)
+	}
+	return "", errors.New("not found dir by import path:" + importPath)
+}
+
+func GetPackageNameFromDir(path string) (string, error) {
 	if !IsDir(path) {
 		path = filepath.Dir(path)
 	}
@@ -76,7 +117,7 @@ func GetGoPath() string {
 	if gopath == "" {
 		gopath = build.Default.GOPATH
 	}
-	return gopath
+	return gopath + "/src"
 }
 
 // file/dir is exists or not
@@ -99,72 +140,3 @@ func IsDir(path string) bool {
 	}
 	return s.IsDir()
 }
-
-//func GetDirFromPackage(environ []string, packagePath string) (string, error) {
-//	exe := exec.Command("go", "list", "-f", "{{.Dir}}", packagePath)
-//	exe.Env = environ
-//	out, err := exe.CombinedOutput()
-//	if err == nil {
-//		return strings.TrimSpace(string(out)), nil
-//	}
-//
-//	dir, err := GetDirFromEmptyPackage(packagePath)
-//	if err != nil {
-//		return "", kerr.Wrap("GXTUPMHETV", err)
-//	}
-//	return dir, nil
-//
-//}
-
-func GetDirFromEmptyPackage(path string) (string, error) {
-	gopath := GetGoPath()
-	gopaths := filepath.SplitList(gopath)
-	for _, gopath := range gopaths {
-		dir := filepath.Join(gopath, "src", path)
-		if s, err := os.Stat(dir); err == nil && s.IsDir() {
-			return dir, nil
-		}
-	}
-	return "", errors.New("not found")
-}
-
-func GetPackageFromDir(dir string) (string, error) {
-	gopath := GetGoPath()
-	gopaths := filepath.SplitList(gopath)
-	var savedError error
-	for _, gopath := range gopaths {
-		if strings.HasPrefix(dir, gopath) {
-			gosrc := fmt.Sprintf("%s/src", gopath)
-			relpath, err := filepath.Rel(gosrc, dir)
-			if err != nil {
-				// notest
-				// I don't *think* we can trigger this error if dir starts with gopath
-				savedError = err
-				continue
-			}
-			if relpath == "" {
-				// notest
-				// I don't *think* we can trigger this either
-				continue
-			}
-			// Remember we're returning a package path which uses forward slashes even on windows
-			return filepath.ToSlash(relpath), nil
-		}
-	}
-	if savedError != nil {
-		// notest
-		return "", savedError
-	}
-	return "", kerr.New("CXOETFPTGM", "Package not found for %s", dir)
-}
-
-//func GetPackagePathFromDir(currentDir string) string {
-//	gopath := GetGoPath()
-//	gopaths := filepath.SplitList(gopath)
-//	for _, gopath := range gopaths {
-//		if strings.HasPrefix(currentDir, gopath) {
-//			return gopath
-//		}
-//	}
-//	return gopaths[0]
-//}

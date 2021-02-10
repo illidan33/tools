@@ -12,7 +12,9 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"tools/common"
 	"tools/template"
@@ -105,9 +107,8 @@ var irisTagInMap = map[string]bool{
 
 type TemplateKipleSwagger struct {
 	template.GenTemplate
-	template.TemplateModel
 
-	ModelList        map[string]template.TemplateModel
+	ModelList        template.TemplateDstDirList
 	TemplateIris     TemplateIris
 	Swagger          SwaggerDocRoot
 	IsInit           uint8
@@ -142,6 +143,7 @@ type TemplateIrisController struct {
 
 type TemplateIrisFunc struct {
 	Package          string
+	PackagePath      string
 	BelongController *TemplateIrisController
 	Url              string
 	Method           string
@@ -233,6 +235,24 @@ var SwagTypeMap = map[string]string{
 	"time.Time": "string",
 }
 
+func (tm *TemplateKipleSwagger) getEntityFromModelList(packageName, name string) *template.TemplateModel {
+	// first, find model from the same package name.
+	for dir, dstDir := range tm.ModelList {
+		if path.Base(dir) == packageName {
+			if v, ok := dstDir.Models[name]; ok {
+				return v
+			}
+		}
+	}
+	// second, find model in ModelList with 'name'.
+	for _, dstDir := range tm.ModelList {
+		if v, ok := dstDir.Models[name]; ok {
+			return v
+		}
+	}
+	return nil
+}
+
 func (tm *TemplateKipleSwagger) getSwagDefPropertyType(modelName, tp string) string {
 	if fType, ok := SwagTypeMap[tp]; ok {
 		return fType
@@ -255,43 +275,47 @@ func (tm *TemplateKipleSwagger) getSwagDefPropertyTagType(modelName, tp string) 
 	}
 }
 
-func (tm *TemplateKipleSwagger) getSwagSchemaMap(modelName, propertyType string) map[string]interface{} {
+func (tm *TemplateKipleSwagger) getSwagSchemaMap(pkg, propertyType string) map[string]interface{} {
 	sch := map[string]interface{}{}
 	if fType, ok := SwagTypeMap[propertyType]; ok {
 		sch["type"] = fType
 	} else if strings.HasPrefix(propertyType, "[]") {
 		sourceType := strings.TrimPrefix(propertyType, "[]")
 		sch["type"] = "array"
-		sch["items"] = tm.getSwagSchemaMap(modelName, sourceType)
+		sch["items"] = tm.getSwagSchemaMap(pkg, sourceType)
 	} else if strings.HasPrefix(propertyType, "map[") {
 		i := strings.Index(propertyType, "]")
 		sourceType := propertyType[i+1:]
 		sch["type"] = "object"
-		sch["additionalProperties"] = tm.getSwagSchemaMap(modelName, sourceType)
+		sch["additionalProperties"] = tm.getSwagSchemaMap(pkg, sourceType)
 	} else {
 		//sch["type"] = "object"
-		if v, ok := tm.ModelList[propertyType]; ok {
+		model := tm.getEntityFromModelList(pkg, propertyType)
+		if model != nil {
 			swagDef := SwaggerDefinition{
 				Type:       "object",
 				Properties: map[string]interface{}{},
 			}
-			for _, field := range v.TemplateModelFields {
+			for _, field := range model.TemplateModelFields {
 				if field.JsonName == "-" {
 					continue
 				}
-				swagDef.Properties[field.JsonName] = tm.getSwagPropertity(v.Package, field)
+				if field.JsonName != "" {
+					swagDef.Properties[field.JsonName] = tm.getSwagPropertity(model.Package, field)
+				} else {
+					swagDef.Properties[field.Name] = tm.getSwagPropertity(model.Package, field)
+				}
 			}
-			tm.Swagger.Definitions[fmt.Sprintf("%s.%s", v.Package, v.ModelName)] = swagDef
+			tm.Swagger.Definitions[fmt.Sprintf("%s.%s", model.Package, model.ModelName)] = swagDef
 		}
-
 		return map[string]interface{}{
-			"$ref": "#/definitions/" + modelName + "." + propertyType,
+			"$ref": "#/definitions/" + pkg + "." + propertyType,
 		}
 	}
 	return sch
 }
 
-func (tm *TemplateKipleSwagger) getSwagPropertity(pkg string, field template.TemplateModelField) map[string]interface{} {
+func (tm *TemplateKipleSwagger) getSwagPropertity(pkg string, field *template.TemplateModelField) map[string]interface{} {
 	pro := map[string]interface{}{}
 	if fType, ok := SwagTypeMap[field.Type]; ok {
 		pro["type"] = fType
@@ -308,15 +332,16 @@ func (tm *TemplateKipleSwagger) getSwagPropertity(pkg string, field template.Tem
 	return pro
 }
 
-func (tm *TemplateKipleSwagger) getSwagReqParam(param SwaggerDefinitionProperty) map[string]interface{} {
+func (tm *TemplateKipleSwagger) getSwagReqParam(pkg string, param SwaggerDefinitionProperty) map[string]interface{} {
 	pro := map[string]interface{}{
 		"name":        param.Name,
 		"in":          param.In,
 		"description": param.Description,
 		"required":    param.Required,
 	}
-	if v, ok := tm.ModelList[param.Type]; ok {
-		pro["schema"] = tm.getSwagSchemaMap(v.Package, v.Type)
+	model := tm.getEntityFromModelList(pkg, param.Type)
+	if model != nil {
+		pro["schema"] = tm.getSwagSchemaMap(model.Package, model.Type)
 	} else {
 		pro["schema"] = tm.getSwagSchemaMap(param.Package, param.Type)
 	}
@@ -330,12 +355,13 @@ func (tm *TemplateKipleSwagger) getSwagResp(resp SwaggerPathResp) map[string]int
 	return pro
 }
 
-func (tm *TemplateKipleSwagger) parseFuncDef(pkg, controllerName, method, apiUrl, name, tag, comment string) error {
+func (tm *TemplateKipleSwagger) parseFuncDef(im template.TemplateDstFileImport, controllerName, method, apiUrl, name, tag, comment string) error {
 	method = strings.ToLower(strings.Trim(method, "\""))
 	apiUrl = strings.Trim(apiUrl, "\"")
 	name = strings.Trim(name, "\"")
 	api := TemplateIrisFunc{
-		Package:          pkg,
+		Package:          im.Name,
+		PackagePath:      im.Path,
 		BelongController: nil,
 		Url:              apiUrl,
 		Method:           method,
@@ -353,8 +379,11 @@ func (tm *TemplateKipleSwagger) parseFuncDef(pkg, controllerName, method, apiUrl
 	}
 	var req template.TemplateModel
 	reqModelName := name + "Request"
-	if v, ok := tm.ModelList[reqModelName]; ok {
-		req = v
+	// 先找controller同包名的entity，再找request包下entity；
+	var model *template.TemplateModel
+	model = tm.getEntityFromModelList(im.Name, reqModelName)
+	if model != nil {
+		req = *model
 		hasTag := false
 		for _, field := range req.TemplateModelFields {
 			if field.JsonName == "-" {
@@ -428,12 +457,13 @@ func (tm *TemplateKipleSwagger) parseFuncDef(pkg, controllerName, method, apiUrl
 
 	api.Responses = make([]SwaggerPathResp, 0)
 	respModelName := name + "Response"
-	resp, ok := tm.ModelList[respModelName]
-	if ok {
+	var rsModel *template.TemplateModel
+	rsModel = tm.getEntityFromModelList(im.Name, respModelName)
+	if rsModel != nil {
 		tmpResp := SwaggerPathResp{
 			ResponseCode: "200",
 			Description:  "OK",
-			Model:        resp,
+			Model:        *rsModel,
 		}
 		api.Responses = append(api.Responses, tmpResp)
 	}
@@ -443,22 +473,11 @@ func (tm *TemplateKipleSwagger) parseFuncDef(pkg, controllerName, method, apiUrl
 }
 
 func (tm *TemplateKipleSwagger) ParsePojoDir(dir string) error {
-	if !common.IsExists(dir) {
-		return errors.New(dir + " is not exist")
-	}
-
-	mList, err := tm.ParseModelDir(dir, false)
+	var err error
+	tm.ModelList, err = template.ParseDstDir(dir, -1)
 	if err != nil {
 		return err
 	}
-	for _, model := range mList {
-		if _, ok := tm.ModelList[model.ModelName]; ok {
-			log.Println("ParsePojoDir - model name repeat:" + model.ModelName)
-			continue
-		}
-		tm.ModelList[model.ModelName] = model
-	}
-
 	return nil
 }
 
@@ -466,7 +485,7 @@ func (tm *TemplateKipleSwagger) genDstFileToFile(dstFilePath string, node *dst.F
 	bt := bytes.NewBuffer([]byte{})
 	err = decorator.Fprint(bt, node)
 	if err != nil {
-		log.Println(dstFilePath +" genDstFileToFile error: " + err.Error())
+		log.Println(dstFilePath + " genDstFileToFile error: " + err.Error())
 		return
 	}
 	var file *os.File
@@ -475,7 +494,7 @@ func (tm *TemplateKipleSwagger) genDstFileToFile(dstFilePath string, node *dst.F
 		return err
 	}
 	defer file.Close()
-	_,err = file.Write(bt.Bytes())
+	_, err = file.Write(bt.Bytes())
 	return
 }
 
@@ -542,7 +561,7 @@ func (tm *TemplateKipleSwagger) ParseSwagTitle(file string) error {
 		}
 	}
 	if !flag {
-		projectPkg, err := common.GetPackageFromDir(filepath.Dir(file))
+		projectPkg, err := common.GetPackageNameFromDir(filepath.Dir(file))
 		if err != nil {
 			return err
 		}
@@ -753,7 +772,7 @@ func (tm *TemplateKipleSwagger) parseIrisMvcConfig(call *dst.CallExpr) (err erro
 	return
 }
 
-func (tm *TemplateKipleSwagger) parseIrisMvcFuncName(pkg, cName, name, comment string) error {
+func (tm *TemplateKipleSwagger) parseIrisMvcFuncName(im template.TemplateDstFileImport, cName, name, comment string) error {
 	// 已经记录到BeforeActivation的func，以BeforeActivation的为准，不再解析func名称中的method。
 	if _, ok := tm.TemplateIris.Funcs[cName+"-"+name]; ok {
 		return nil
@@ -772,14 +791,14 @@ func (tm *TemplateKipleSwagger) parseIrisMvcFuncName(pkg, cName, name, comment s
 	}
 	//name = common.ToLowerCamelCase(name[k:])
 	url := common.ToLowerSnakeCase(name[k:])
-	err := tm.parseFuncDef(pkg, cName, method, url, name, cName, comment)
+	err := tm.parseFuncDef(im, cName, method, url, name, cName, comment)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (tm *TemplateKipleSwagger) parseRouter(pkg string, fc *dst.FuncDecl) error {
+func (tm *TemplateKipleSwagger) parseRouter(im template.TemplateDstFileImport, fc *dst.FuncDecl) error {
 	for _, stmt := range fc.Body.List {
 		switch realStmt := stmt.(type) {
 		case *dst.ExprStmt:
@@ -821,7 +840,7 @@ func (tm *TemplateKipleSwagger) parseRouter(pkg string, fc *dst.FuncDecl) error 
 	return nil
 }
 
-func (tm *TemplateKipleSwagger) parseContollerBefore(pkg string, fc *dst.FuncDecl) error {
+func (tm *TemplateKipleSwagger) parseContollerBefore(im template.TemplateDstFileImport, fc *dst.FuncDecl) error {
 	for _, stmt := range fc.Body.List {
 		expr, ok := stmt.(*dst.ExprStmt)
 		if !ok {
@@ -837,9 +856,9 @@ func (tm *TemplateKipleSwagger) parseContollerBefore(pkg string, fc *dst.FuncDec
 		method, ok := call.Args[0].(*dst.BasicLit)
 		url, ok := call.Args[1].(*dst.BasicLit)
 		name, ok := call.Args[2].(*dst.BasicLit)
-		comment := tm.ParseDstCommentFromNode(expr.Decs.NodeDecs, true)
-		controllerName := tm.ParseDstNodeType(fc.Recv.List[0].Type)
-		err := tm.parseFuncDef(pkg, controllerName, method.Value, url.Value, name.Value, controllerName, comment)
+		comment := template.ParseDstCommentFromNode(expr.Decs.NodeDecs, true)
+		controllerName := template.ParseDstNodeType(fc.Recv.List[0].Type)
+		err := tm.parseFuncDef(im, controllerName, method.Value, url.Value, name.Value, controllerName, comment)
 		if err != nil {
 			return err
 		}
@@ -847,9 +866,9 @@ func (tm *TemplateKipleSwagger) parseContollerBefore(pkg string, fc *dst.FuncDec
 	return nil
 }
 
-func (tm *TemplateKipleSwagger) parseContoller(pkg string, fc *dst.FuncDecl) error {
+func (tm *TemplateKipleSwagger) parseContoller(im template.TemplateDstFileImport, fc *dst.FuncDecl) error {
 	// parse functions of controller
-	controllerName := tm.ParseDstNodeType(fc.Recv.List[0].Type)
+	controllerName := template.ParseDstNodeType(fc.Recv.List[0].Type)
 	if fun, ok := tm.TemplateIris.Funcs[fc.Name.Name]; ok && fun.BelongController != nil && fun.BelongController.Name == controllerName {
 		var oldDecs string
 		for _, v := range fc.Decs.Start.All() {
@@ -861,8 +880,8 @@ func (tm *TemplateKipleSwagger) parseContoller(pkg string, fc *dst.FuncDecl) err
 		fun.Description = oldDecs
 		tm.TemplateIris.Funcs[fc.Name.Name] = fun
 	} else {
-		comment := tm.ParseDstCommentFromNode(fc.Decs.NodeDecs, true)
-		err := tm.parseIrisMvcFuncName(pkg, controllerName, fc.Name.Name, comment)
+		comment := template.ParseDstCommentFromNode(fc.Decs.NodeDecs, true)
+		err := tm.parseIrisMvcFuncName(im, controllerName, fc.Name.Name, comment)
 		if err != nil {
 			return err
 		}
@@ -888,13 +907,30 @@ func (tm *TemplateKipleSwagger) ParseControllerRouter(dir string) error {
 				return err
 			}
 			pkg := dstFile.Name.Name
+			im := template.TemplateDstFileImport{
+				Name: pkg,
+			}
+			for _, v := range dstFile.Imports {
+				pathValue, _ := strconv.Unquote(v.Path.Value)
+				name := ""
+				if v.Name != nil {
+					name = v.Name.Name
+				}
+				if name == "" {
+					name = path.Base(pathValue)
+				}
+				if name == pkg {
+					im.Path = pathValue
+					break
+				}
+			}
 			for _, decl := range dstFile.Decls {
 				fc, ok := decl.(*dst.FuncDecl)
 				if !ok {
 					continue
 				}
 				if fc.Name.Name == tm.RouterName {
-					err = tm.parseRouter(pkg, fc)
+					err = tm.parseRouter(im, fc)
 					if err != nil {
 						return err
 					}
@@ -925,20 +961,37 @@ func (tm *TemplateKipleSwagger) ParseControllers(dir string) error {
 				return err
 			}
 			pkg := dstFile.Name.Name // package name
+			im := template.TemplateDstFileImport{
+				Name: pkg,
+			}
+			for _, v := range dstFile.Imports {
+				pathValue, _ := strconv.Unquote(v.Path.Value)
+				name := ""
+				if v.Name != nil {
+					name = v.Name.Name
+				}
+				if name == "" {
+					name = path.Base(pathValue)
+				}
+				if name == pkg {
+					im.Path = pathValue
+					break
+				}
+			}
 			for _, decl := range dstFile.Decls {
 				fc, ok := decl.(*dst.FuncDecl)
 				if !ok {
 					continue
 				}
 				if fc.Name.Name == tm.ControllerBefore {
-					err = tm.parseContollerBefore(pkg, fc)
+					err = tm.parseContollerBefore(im, fc)
 					if err != nil {
 						return err
 					}
 				} else if fc.Name.Name == tm.RouterName {
 
 				} else if fc.Recv != nil && len(fc.Recv.List) > 0 {
-					err = tm.parseContoller(pkg, fc)
+					err = tm.parseContoller(im, fc)
 					if err != nil {
 						return err
 					}
@@ -955,12 +1008,6 @@ func (tm *TemplateKipleSwagger) ParseControllers(dir string) error {
 					}
 				}
 			}
-			//if tm.IsInit != 0 {
-			//	err = tm.genDstFileToFile(fpath, dstFile)
-			//	if err != nil {
-			//		return errors.New("FormatCodeToFile - write file error: " + err.Error())
-			//	}
-			//}
 		}
 	}
 	return nil
@@ -990,7 +1037,7 @@ func (tm *TemplateKipleSwagger) OverWriteControllerDir(dir string) error {
 					continue
 				}
 				if fc.Recv != nil && len(fc.Recv.List) > 0 {
-					tag := tm.ParseDstNodeType(fc.Recv.List[0].Type)
+					tag := template.ParseDstNodeType(fc.Recv.List[0].Type)
 					for _, path := range tm.TemplateIris.Funcs {
 						if tag == path.Tag && fc.Name.Name == path.FuncName {
 							var oldDecs string
@@ -1076,40 +1123,40 @@ func (tm *TemplateKipleSwagger) SetSwaggerPaths() error {
 	}
 
 	tm.Swagger.Paths = map[string]map[string]SwaggerPath{}
-	for k, path := range tm.TemplateIris.Funcs {
-		if path.BelongController == nil {
-			log.Println("not found controller:" + path.Tag)
+	for k, funcPath := range tm.TemplateIris.Funcs {
+		if funcPath.BelongController == nil {
+			log.Println("not found controller:" + funcPath.Tag)
 			continue
 		}
 		api := SwaggerPath{
-			Consumes:    path.Consumes,
-			Produces:    path.Produces,
-			Tags:        []string{path.Tag},
-			Summary:     path.Summary,
-			Description: path.Description,
+			Consumes:    funcPath.Consumes,
+			Produces:    funcPath.Produces,
+			Tags:        []string{funcPath.Tag},
+			Summary:     funcPath.Summary,
+			Description: funcPath.Description,
 			Parameters:  []map[string]interface{}{},
 			Responses:   map[string]map[string]interface{}{},
 		}
-		if path.Url[0] != '/' {
-			path.Url = "/" + path.Url
+		if funcPath.Url[0] != '/' {
+			funcPath.Url = "/" + funcPath.Url
 		}
-		path.Url = path.BelongController.Url + path.Url
-		tm.TemplateIris.Funcs[k] = path
+		funcPath.Url = funcPath.BelongController.Url + funcPath.Url
+		tm.TemplateIris.Funcs[k] = funcPath
 
-		for _, param := range path.Parameters {
-			typeMap := tm.getSwagReqParam(param)
+		for _, param := range funcPath.Parameters {
+			typeMap := tm.getSwagReqParam(funcPath.Package, param)
 			api.Parameters = append(api.Parameters, typeMap)
 		}
-		for _, resp := range path.Responses {
+		for _, resp := range funcPath.Responses {
 			api.Responses[resp.ResponseCode] = tm.getSwagResp(resp)
 		}
 
-		if p, ok := tm.Swagger.Paths[path.Url]; ok {
-			p[path.Method] = api
-			tm.Swagger.Paths[path.Url] = p
+		if p, ok := tm.Swagger.Paths[funcPath.Url]; ok {
+			p[funcPath.Method] = api
+			tm.Swagger.Paths[funcPath.Url] = p
 		} else {
-			tm.Swagger.Paths[path.Url] = map[string]SwaggerPath{
-				path.Method: api,
+			tm.Swagger.Paths[funcPath.Url] = map[string]SwaggerPath{
+				funcPath.Method: api,
 			}
 		}
 	}

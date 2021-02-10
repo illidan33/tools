@@ -639,9 +639,9 @@ func (gt *GormTable) transformGormToModel(tm *TemplateModel, gormFlags GormFlags
 
 		tgsf.Tag += "`"
 		if tm.TemplateModelFields == nil {
-			tm.TemplateModelFields = make([]TemplateModelField, 0)
+			tm.TemplateModelFields = make([]*TemplateModelField, 0)
 		}
-		tm.TemplateModelFields = append(tm.TemplateModelFields, tgsf)
+		tm.TemplateModelFields = append(tm.TemplateModelFields, &tgsf)
 	}
 
 	// indexs
