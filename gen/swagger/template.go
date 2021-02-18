@@ -325,7 +325,7 @@ func (tm *TemplateKipleSwagger) getSwagPropertity(pkg string, field *template.Te
 	pro["description"] = field.Comment
 	tags, _ := structtag.Parse(field.Tag)
 	val, _ := tags.Get("validate")
-	if val != nil && strings.Trim(val.Value(), "\"") == "required" {
+	if val != nil && strings.Contains(strings.Trim(val.Value(), "\""), "required") {
 		pro["required"] = true
 	}
 
